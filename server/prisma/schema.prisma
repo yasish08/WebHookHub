@@ -1,0 +1,106 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum EndpointStatus {
+  ACTIVE
+  PAUSED
+  DISABLED
+}
+
+enum EventStatus {
+  ACCEPTED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum DeliveryStatus {
+  PENDING
+  PROCESSING
+  DELIVERED
+  RETRYING
+  FAILED
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  endpoints    Endpoint[]
+}
+
+model Endpoint {
+  id            String         @id @default(cuid())
+  name          String
+  url           String
+  secret        String
+  status        EndpointStatus @default(ACTIVE)
+  eventTypes    String[]       @default([])
+  userId        String
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries    Delivery[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([userId, status])
+}
+
+model Event {
+  id          String      @id @default(cuid())
+  eventType   String
+  payload     Json
+  status      EventStatus @default(ACCEPTED)
+  idempotencyKey String?  @unique
+  deliveries  Delivery[]
+  createdAt   DateTime    @default(now())
+
+  @@index([eventType, createdAt])
+  @@index([status, createdAt])
+}
+
+model Delivery {
+  id             String         @id @default(cuid())
+  eventId        String
+  endpointId     String
+  status         DeliveryStatus @default(PENDING)
+  attemptCount   Int            @default(0)
+  responseStatus Int?
+  responseBody   String?        @db.Text
+  errorMessage   String?        @db.Text
+  durationMs     Int?
+  nextAttemptAt  DateTime?
+  deliveredAt    DateTime?
+  event          Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  endpoint       Endpoint       @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  attempts       DeliveryAttempt[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([status, nextAttemptAt])
+  @@index([endpointId, createdAt])
+  @@index([eventId])
+}
+
+model DeliveryAttempt {
+  id             String   @id @default(cuid())
+  deliveryId     String
+  attemptNumber  Int
+  responseStatus Int?
+  responseBody   String?  @db.Text
+  errorMessage   String?  @db.Text
+  durationMs     Int?
+  createdAt      DateTime @default(now())
+  delivery       Delivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+
+  @@unique([deliveryId, attemptNumber])
+  @@index([createdAt])
+}
