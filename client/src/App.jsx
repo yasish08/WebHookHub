@@ -27,6 +27,7 @@ function App() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All events");
   const [copied, setCopied] = useState(false);
+  const [testEventState, setTestEventState] = useState("idle");
 
   useEffect(() => {
     let alive = true;
@@ -50,6 +51,34 @@ function App() {
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
       setCopied(false);
+    }
+  };
+
+  const sendTestEvent = async () => {
+    setTestEventState("sending");
+    try {
+      const response = await fetch("/api/events", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": `dashboard-test-${Date.now()}`,
+        },
+        body: JSON.stringify({
+          eventType: "webhookhub.test",
+          payload: {
+            source: "dashboard",
+            message: "Hello from WebHookHub",
+            sentAt: new Date().toISOString(),
+          },
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Event ingestion failed");
+      setTestEventState("sent");
+      window.setTimeout(() => setTestEventState("idle"), 2500);
+    } catch {
+      setTestEventState("error");
+      window.setTimeout(() => setTestEventState("idle"), 3000);
     }
   };
 
@@ -112,7 +141,7 @@ function App() {
               <h1>{activeNav === "Overview" ? "Good evening, Yasish" : activeNav}<span className="heading-period">.</span></h1>
               <p className="subtitle">Here's what's happening with your webhook delivery pipeline.</p>
             </div>
-            <button className="primary-button" onClick={copyEndpoint}><Icon>＋</Icon> {copied ? "Copied endpoint" : "Send test event"}</button>
+            <button className="primary-button" onClick={sendTestEvent} disabled={testEventState === "sending"}><Icon>{testEventState === "sent" ? "✓" : testEventState === "error" ? "!" : "＋"}</Icon> {testEventState === "sending" ? "Sending event…" : testEventState === "sent" ? "Event accepted" : testEventState === "error" ? "Send failed — retry" : "Send test event"}</button>
           </section>
 
           <section className="endpoint-banner">
