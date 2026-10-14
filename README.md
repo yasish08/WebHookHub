@@ -12,18 +12,26 @@ WebHookHub is a developer-first webhook delivery platform built to accept events
 - **Planned delivery engine:** Redis-backed queue and workers
 - **Security direction:** HMAC-SHA256 signatures, endpoint validation, scoped authentication
 
-## Day 1 status
+## Build status
 
+### Day 1 — Foundation
 - [x] Monorepo workspace and local development scripts
 - [x] Responsive dark developer dashboard starter
-- [x] Express API with `GET /api` and `GET /api/health`
+- [x] Express API health and discovery routes
 - [x] Prisma schema for users, endpoints, events, deliveries, and delivery attempts
 - [x] Environment template and Git ignore rules
-- [ ] Install dependencies and run a local build
-- [ ] Configure PostgreSQL and apply the schema
-- [ ] Replace dashboard demo data with real API data
 
-Dashboard metric and delivery rows are currently **illustrative demo data**. They are not live delivery metrics yet.
+### Day 2 — Event ingestion
+- [x] Add `POST /api/events` to validate and persist events
+- [x] Validate event types, object payloads, and idempotency key length
+- [x] Support the `Idempotency-Key` header and avoid duplicate event records
+- [x] Add built-in Node.js tests for event input validation
+- [x] Wire the dashboard's **Send test event** button to the real API route
+- [ ] Install dependencies and run a local build/test pass
+- [ ] Configure PostgreSQL and apply the schema
+- [ ] Add endpoint management and queued delivery workers
+
+Dashboard metric cards, activity chart, endpoint health rows, and recent-delivery table are still **illustrative demo data**. The test-event button now submits a real event to the API; a successful response means the event was stored as accepted, not that it has been delivered to a customer endpoint yet.
 
 ## Prerequisites
 
@@ -58,12 +66,34 @@ Dashboard metric and delivery rows are currently **illustrative demo data**. The
 
 The API health endpoint is [http://localhost:4000/api/health](http://localhost:4000/api/health). It returns a degraded status until PostgreSQL is configured and reachable.
 
+### Send a test event
+
+With the API running and PostgreSQL configured, submit an event:
+
+```bash
+curl -X POST http://localhost:4000/api/events \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: demo-payment-001" \
+  -d '{"eventType":"payment.succeeded","payload":{"orderId":"ord_123","amount":499}}'
+```
+
+A new event returns `202 Accepted`. Reusing the same idempotency key returns the previously stored event with `200 OK`. Event ingestion does **not** dispatch webhooks yet; queueing and delivery workers are planned next.
+
+Run the current input-validation tests with:
+
+```bash
+npm test
+```
+
+These tests use Node's built-in test runner and do not require a running PostgreSQL database.
+
 ## API starter
 
 | Method | Route | Purpose |
 | --- | --- | --- |
 | GET | `/api` | API identity and route discovery |
 | GET | `/api/health` | API and database health |
+| POST | `/api/events` | Validate and persist an event (requires PostgreSQL) |
 
 ## Product roadmap
 
