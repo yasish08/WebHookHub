@@ -37,3 +37,10 @@ export function validateEventInput(body, idempotencyKey) {
 }
 
 export { MAX_IDEMPOTENCY_KEY_LENGTH };
+
+export function validateEndpointName(name) {
+  if (typeof name !== "string" || name.trim().length < 1 || name.trim().length > 80) {
+    return { ok: false, error: "Endpoint name must be between 1 and 80 characters." };
+  }
+  return { ok: true, value: name.trim() };
+}
