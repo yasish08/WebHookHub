@@ -2,6 +2,7 @@ import "dotenv/config";
 import cors from "cors";
 import express from "express";
 import { PrismaClient } from "@prisma/client";
+import { validateEventInput } from "./eventValidation.js";
 
 const app = express();
 const prisma = new PrismaClient();
@@ -16,7 +17,7 @@ app.get("/api/health", async (_req, res) => {
     try {
       await prisma.$queryRaw`SELECT 1`;
       database = "connected";
-    } catch (error) {
+    } catch {
       database = "unavailable";
     }
   }
@@ -34,8 +35,71 @@ app.get("/api", (_req, res) => {
     name: "WebHookHub API",
     version: "1.0.0",
     message: "Reliable webhook delivery starts here.",
-    health: "/api/health",
+    routes: {
+      health: "GET /api/health",
+      ingestEvent: "POST /api/events",
+    },
   });
+});
+
+app.post("/api/events", async (req, res) => {
+  const headerKey = req.get("Idempotency-Key");
+  const bodyKey = typeof req.body?.idempotencyKey === "string" ? req.body.idempotencyKey : undefined;
+  const rawKey = headerKey ?? bodyKey;
+  const idempotencyKey = typeof rawKey === "string" ? rawKey.trim() : undefined;
+  const validation = validateEventInput(req.body, idempotencyKey);
+
+  if (!validation.ok) {
+    return res.status(validation.status).json({
+      error: validation.error,
+      message: validation.message,
+    });
+  }
+
+  if (!process.env.DATABASE_URL) {
+    return res.status(503).json({
+      error: "database_not_configured",
+      message: "Configure DATABASE_URL before ingesting events.",
+    });
+  }
+
+  try {
+    if (validation.value.idempotencyKey) {
+      const existing = await prisma.event.findUnique({
+        where: { idempotencyKey: validation.value.idempotencyKey },
+        select: { id: true, eventType: true, status: true, createdAt: true },
+      });
+      if (existing) {
+        return res.status(200).json({ event: existing, duplicate: true });
+      }
+    }
+
+    const event = await prisma.event.create({
+      data: validation.value,
+      select: { id: true, eventType: true, status: true, createdAt: true },
+    });
+    return res.status(202).json({ event, duplicate: false });
+  } catch (error) {
+    // Concurrent requests can race after the lookup. A unique-key conflict is
+    // treated as an idempotent replay instead of creating a second event.
+    if (error?.code === "P2002" && validation.value.idempotencyKey) {
+      try {
+        const existing = await prisma.event.findUnique({
+          where: { idempotencyKey: validation.value.idempotencyKey },
+          select: { id: true, eventType: true, status: true, createdAt: true },
+        });
+        if (existing) return res.status(200).json({ event: existing, duplicate: true });
+      } catch (lookupError) {
+        console.error("[api:idempotency_lookup_error]", lookupError);
+      }
+    }
+
+    console.error("[api:event_ingestion_error]", error);
+    return res.status(500).json({
+      error: "event_ingestion_failed",
+      message: "The event could not be stored. Please retry with the same Idempotency-Key.",
+    });
+  }
 });
 
 app.use((req, res) => {
