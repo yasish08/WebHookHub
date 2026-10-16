@@ -135,6 +135,7 @@ function App() {
         </header>
 
         <div className="page-wrap">
+          {activeNav === "Endpoints" ? <EndpointsManager /> : <>
           <section className="page-heading">
             <div>
               <div className="eyebrow"><span className="eyebrow-line" /> WEBHOOK INFRASTRUCTURE</div>
@@ -206,8 +207,205 @@ function App() {
           </section>
 
           <footer className="page-footer"><span>© 2026 WebHookHub</span><span><span className="footer-live-dot" /> All systems operational <span className="footer-separator">·</span> Built for reliable delivery</span><a href="https://github.com/yasish08/WebHookHub" target="_blank" rel="noreferrer">GitHub <Icon>↗</Icon></a></footer>
+          </>}
         </div>
       </main>
+    </div>
+  );
+}
+
+
+function EndpointsManager() {
+  const [token, setToken] = useState(() => sessionStorage.getItem("webhookhub_access_token") || "");
+  const [authMode, setAuthMode] = useState("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [endpoints, setEndpoints] = useState([]);
+  const [endpointName, setEndpointName] = useState("");
+  const [endpointUrl, setEndpointUrl] = useState("");
+  const [eventTypes, setEventTypes] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [revealedSecret, setRevealedSecret] = useState("");
+
+  const request = async (path, options = {}, accessToken = token) => {
+    const response = await fetch(path, {
+      ...options,
+      headers: {
+        ...(options.body ? { "Content-Type": "application/json" } : {}),
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        ...(options.headers || {}),
+      },
+    });
+    const data = response.status === 204 ? null : await response.json();
+    if (!response.ok) throw new Error(data?.message || "Request failed.");
+    return data;
+  };
+
+  const loadEndpoints = async (accessToken = token) => {
+    const data = await request("/api/endpoints", {}, accessToken);
+    setEndpoints(data.endpoints || []);
+  };
+
+  useEffect(() => {
+    if (!token) return;
+    loadEndpoints().catch((err) => {
+      setError(err.message);
+      if (/token|unauthorized|account/i.test(err.message)) {
+        sessionStorage.removeItem("webhookhub_access_token");
+        setToken("");
+      }
+    });
+  }, [token]);
+
+  const submitAuth = async (event) => {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const data = await request(`/api/auth/${authMode === "register" ? "register" : "login"}`, {
+        method: "POST",
+        body: JSON.stringify({ email, password, ...(authMode === "register" ? { name } : {}) }),
+      }, "");
+      sessionStorage.setItem("webhookhub_access_token", data.accessToken);
+      setToken(data.accessToken);
+      setPassword("");
+      setNotice(`Signed in as ${data.user.email}`);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const createEndpoint = async (event) => {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    setNotice("");
+    setRevealedSecret("");
+    try {
+      const data = await request("/api/endpoints", {
+        method: "POST",
+        body: JSON.stringify({
+          name: endpointName,
+          url: endpointUrl,
+          eventTypes: eventTypes.split(",").map((item) => item.trim()).filter(Boolean),
+        }),
+      });
+      setEndpoints((current) => [data.endpoint, ...current]);
+      setEndpointName("");
+      setEndpointUrl("");
+      setEventTypes("");
+      setRevealedSecret(data.signingSecret);
+      setNotice("Endpoint created. Copy the signing secret now; it will not be shown again.");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleEndpoint = async (endpoint) => {
+    setError("");
+    setNotice("");
+    try {
+      const data = await request(`/api/endpoints/${endpoint.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: endpoint.status === "ACTIVE" ? "PAUSED" : "ACTIVE" }),
+      });
+      setEndpoints((current) => current.map((item) => item.id === endpoint.id ? data.endpoint : item));
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const deleteEndpoint = async (endpoint) => {
+    if (!window.confirm(`Delete endpoint "${endpoint.name}"? This also removes its delivery history.`)) return;
+    setError("");
+    try {
+      await request(`/api/endpoints/${endpoint.id}`, { method: "DELETE" });
+      setEndpoints((current) => current.filter((item) => item.id !== endpoint.id));
+      setNotice("Endpoint deleted.");
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const rotateSecret = async (endpoint) => {
+    setError("");
+    setNotice("");
+    try {
+      const data = await request(`/api/endpoints/${endpoint.id}/rotate-secret`, { method: "POST", body: JSON.stringify({}) });
+      setRevealedSecret(data.signingSecret);
+      setNotice(`Signing secret rotated for ${endpoint.name}. Update the receiver before sending production events.`);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const signOut = () => {
+    sessionStorage.removeItem("webhookhub_access_token");
+    setToken("");
+    setEndpoints([]);
+    setRevealedSecret("");
+    setNotice("Signed out.");
+    setError("");
+  };
+
+  return (
+    <div className="endpoint-manager">
+      <section className="page-heading endpoint-manager-heading">
+        <div>
+          <div className="eyebrow"><span className="eyebrow-line" /> DESTINATION CONFIGURATION</div>
+          <h1>Endpoints<span className="heading-period">.</span></h1>
+          <p className="subtitle">Manage secure webhook destinations for your workspace.</p>
+        </div>
+        {token && <button className="secondary-button" onClick={signOut}>Sign out</button>}
+      </section>
+
+      {error && <div className="manager-alert error-alert" role="alert">{error}</div>}
+      {notice && <div className="manager-alert success-alert" role="status">{notice}</div>}
+      {revealedSecret && <div className="secret-reveal"><div><strong>Signing secret — shown once</strong><code>{revealedSecret}</code></div><button className="secondary-button" onClick={() => navigator.clipboard.writeText(revealedSecret).then(() => setNotice("Signing secret copied."))}>Copy secret</button></div>}
+
+      {!token ? (
+        <section className="panel auth-panel">
+          <div className="panel-heading"><div><h2>{authMode === "login" ? "Welcome back" : "Create your account"}</h2><p>{authMode === "login" ? "Sign in to manage your endpoints." : "Create a workspace account to get started."}</p></div></div>
+          <form className="manager-form auth-form" onSubmit={submitAuth}>
+            {authMode === "register" && <label>Display name<input value={name} onChange={(event) => setName(event.target.value)} maxLength={80} placeholder="Your name" autoComplete="name" /></label>}
+            <label>Email address<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required maxLength={254} placeholder="you@company.com" autoComplete="email" /></label>
+            <label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={10} maxLength={128} placeholder="At least 10 characters" autoComplete={authMode === "login" ? "current-password" : "new-password"} /></label>
+            <button className="primary-button" type="submit" disabled={busy}>{busy ? "Please wait…" : authMode === "login" ? "Sign in" : "Create account"}</button>
+          </form>
+          <p className="auth-switch">{authMode === "login" ? "New to WebHookHub?" : "Already have an account?"} <button onClick={() => { setAuthMode(authMode === "login" ? "register" : "login"); setError(""); }}>{authMode === "login" ? "Create an account" : "Sign in"}</button></p>
+          <p className="auth-note">Requires a running API, PostgreSQL, and configured JWT_SECRET.</p>
+        </section>
+      ) : (
+        <>
+          <section className="panel endpoint-create-panel">
+            <div className="panel-heading"><div><h2>Add an endpoint</h2><p>We validate the destination before saving it.</p></div><span className="endpoint-count">{endpoints.length} configured</span></div>
+            <form className="manager-form endpoint-form" onSubmit={createEndpoint}>
+              <label>Endpoint name<input value={endpointName} onChange={(event) => setEndpointName(event.target.value)} required maxLength={80} placeholder="payments-prod" /></label>
+              <label>Destination URL<input type="url" value={endpointUrl} onChange={(event) => setEndpointUrl(event.target.value)} required maxLength={2048} placeholder="https://api.example.com/webhooks" /></label>
+              <label>Event types <span className="optional-label">optional · comma-separated</span><input value={eventTypes} onChange={(event) => setEventTypes(event.target.value)} placeholder="payment.succeeded, invoice.paid" /></label>
+              <button className="primary-button" type="submit" disabled={busy}><Icon>＋</Icon>{busy ? "Saving…" : "Create endpoint"}</button>
+            </form>
+          </section>
+          <section className="panel endpoint-list-panel">
+            <div className="panel-heading"><div><h2>Your destinations</h2><p>Signing secrets are never included in endpoint list responses.</p></div><button className="text-button" onClick={() => loadEndpoints().catch((err) => setError(err.message))}>Refresh <Icon>↻</Icon></button></div>
+            {endpoints.length === 0 ? <div className="manager-empty"><span className="empty-mark">⌁</span><strong>No endpoints yet</strong><p>Create your first destination above to start configuring webhook delivery.</p></div> : endpoints.map((endpoint) => (
+              <article className="managed-endpoint" key={endpoint.id}>
+                <div className="endpoint-avatar purple">{endpoint.name.slice(0, 1).toUpperCase()}</div>
+                <div className="managed-endpoint-main"><strong>{endpoint.name}</strong><code>{endpoint.url}</code><div className="managed-tags">{(endpoint.eventTypes || []).length ? endpoint.eventTypes.map((type) => <span key={type}>{type}</span>) : <span>All event types</span>}<span className={endpoint.status === "ACTIVE" ? "active-tag" : "paused-tag"}>{endpoint.status}</span></div></div>
+                <div className="managed-endpoint-actions"><button className="secondary-button" onClick={() => toggleEndpoint(endpoint)}>{endpoint.status === "ACTIVE" ? "Pause" : "Activate"}</button><button className="secondary-button" onClick={() => rotateSecret(endpoint)}>Rotate secret</button><button className="danger-button" onClick={() => deleteEndpoint(endpoint)}>Delete</button></div>
+              </article>
+            ))}
+          </section>
+        </>
+      )}
     </div>
   );
 }
