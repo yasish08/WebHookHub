@@ -3,6 +3,8 @@ import cors from "cors";
 import express from "express";
 import { PrismaClient } from "@prisma/client";
 import { validateEventInput } from "./eventValidation.js";
+import { createAuthRouter } from "./auth.js";
+import { createEndpointRouter } from "./endpoints.js";
 
 const app = express();
 const prisma = new PrismaClient();
@@ -10,6 +12,9 @@ const port = Number(process.env.PORT || 4000);
 
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || "http://localhost:5173" }));
 app.use(express.json({ limit: "256kb" }));
+
+app.use("/api/auth", createAuthRouter(prisma));
+app.use("/api/endpoints", createEndpointRouter(prisma));
 
 app.get("/api/health", async (_req, res) => {
   let database = "not_configured";
