@@ -28,8 +28,8 @@ export function parseEndpointUrl(input, { production = process.env.NODE_ENV === 
   if (production && url.protocol !== "https:") {
     return { ok: false, message: "HTTPS is required for endpoint URLs in production." };
   }
-  if (url.port && !["80", "443"].includes(url.port)) {
-    return { ok: false, message: "Only the standard HTTP and HTTPS ports are allowed." };
+  if (url.port && !((url.protocol === "http:" && url.port === "80") || (url.protocol === "https:" && url.port === "443"))) {
+    return { ok: false, message: "Only the standard port for the selected HTTP or HTTPS protocol is allowed." };
   }
 
   const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
