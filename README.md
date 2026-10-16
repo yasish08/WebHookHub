@@ -144,7 +144,7 @@ The response includes `signingSecret` exactly once. Store it securely. Endpoint 
 
 ## Security notes
 
-Never commit real credentials or endpoint secrets. Endpoint signing secrets are encrypted at rest using AES-256-GCM and returned only at creation or rotation. Never commit real credentials. URL validation blocks local/private IPs and checks DNS at endpoint creation/update time; delivery workers must repeat DNS resolution, validate every redirect, and enforce destination IP checks immediately before sending to mitigate DNS rebinding. Production deployment should also add rate limiting, abuse monitoring, and a key-rotation procedure.
+Never commit real credentials or endpoint secrets. Endpoint signing secrets are encrypted at rest using AES-256-GCM and returned only at creation or rotation. The MVP `POST /api/events` route is currently unauthenticated; add scoped API keys and rate limiting before exposing it publicly. Never commit real credentials. URL validation blocks local/private IPs and checks DNS at endpoint creation/update time; delivery workers must repeat DNS resolution, validate every redirect, and enforce destination IP checks immediately before sending to mitigate DNS rebinding. Production deployment should also add rate limiting, abuse monitoring, and a key-rotation procedure.
 
 ## License
 
