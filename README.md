@@ -27,9 +27,17 @@ WebHookHub is a developer-first webhook delivery platform built to accept events
 - [x] Support the `Idempotency-Key` header and avoid duplicate event records
 - [x] Add built-in Node.js tests for event input validation
 - [x] Wire the dashboard's **Send test event** button to the real API route
-- [ ] Install dependencies and run a local build/test pass
-- [ ] Configure PostgreSQL and apply the schema
-- [ ] Add endpoint management and queued delivery workers
+
+### Day 3 — Authentication and endpoint API
+- [x] Register users with bcrypt password hashing and JWT access tokens
+- [x] Add login and authenticated `GET /api/auth/me`
+- [x] Add owner-scoped endpoint list, create, update, delete, and secret rotation routes
+- [x] Encrypt endpoint signing secrets at rest with AES-256-GCM
+- [x] Validate endpoint URL schemes, credentials, ports, local/private IPs, and DNS results
+- [x] Add unit tests for endpoint URL validation and secret encryption
+- [ ] Run the full dependency install, tests, and frontend build in CI
+- [ ] Connect endpoint management screens to the new API
+- [ ] Add delivery queue workers and re-check DNS/IP at the moment of delivery
 
 Dashboard metric cards, activity chart, endpoint health rows, and recent-delivery table are still **illustrative demo data**. The test-event button now submits a real event to the API; a successful response means the event was stored as accepted, not that it has been delivered to a customer endpoint yet.
 
@@ -47,7 +55,7 @@ Dashboard metric cards, activity chart, endpoint health rows, and recent-deliver
    npm install
    ```
 
-2. Copy `.env.example` to `.env` and set `DATABASE_URL` to your local PostgreSQL database.
+2. Copy `.env.example` to `.env`, set `DATABASE_URL`, and replace `JWT_SECRET` and `SECRET_ENCRYPTION_KEY` with separate random values of at least 32 characters. Never commit `.env` or real secrets.
 
 3. Generate the Prisma client and apply the schema:
 
@@ -87,13 +95,42 @@ npm test
 
 These tests use Node's built-in test runner and do not require a running PostgreSQL database.
 
-## API starter
+## API routes
 
-| Method | Route | Purpose |
-| --- | --- | --- |
-| GET | `/api` | API identity and route discovery |
-| GET | `/api/health` | API and database health |
-| POST | `/api/events` | Validate and persist an event (requires PostgreSQL) |
+| Method | Route | Auth | Purpose |
+| --- | --- | --- | --- |
+| GET | `/api` | No | API identity and route discovery |
+| GET | `/api/health` | No | API and database health |
+| POST | `/api/auth/register` | No | Create account and return JWT |
+| POST | `/api/auth/login` | No | Verify credentials and return JWT |
+| GET | `/api/auth/me` | Bearer JWT | Return the current account |
+| GET | `/api/endpoints` | Bearer JWT | List the current user's endpoints |
+| POST | `/api/endpoints` | Bearer JWT | Create endpoint; signing secret is returned once |
+| PATCH | `/api/endpoints/:id` | Bearer JWT | Update owned endpoint fields |
+| DELETE | `/api/endpoints/:id` | Bearer JWT | Delete an owned endpoint |
+| POST | `/api/endpoints/:id/rotate-secret` | Bearer JWT | Rotate and return a signing secret once |
+| POST | `/api/events` | No (MVP) | Validate and persist an event (requires PostgreSQL) |
+
+### Authentication example
+
+```bash
+curl -X POST http://localhost:4000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"dev@example.com","password":"a-long-local-password","name":"Developer"}'
+```
+
+Use the returned `accessToken` as `Authorization: Bearer <token>` on `/api/endpoints` requests. Registration and login require `JWT_SECRET` to be configured.
+
+### Endpoint creation example
+
+```bash
+curl -X POST http://localhost:4000/api/endpoints \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"payments-prod","url":"https://hooks.example.com/events","eventTypes":["payment.succeeded"]}'
+```
+
+The response includes `signingSecret` exactly once. Store it securely. Endpoint secrets are encrypted in the database using `SECRET_ENCRYPTION_KEY`; losing or changing that key makes previously encrypted secrets unreadable. Endpoint URLs are DNS-checked at creation/update time, but the delivery worker must repeat destination resolution and private-IP checks at send time to defend against DNS rebinding.
 
 ## Product roadmap
 
@@ -107,7 +144,7 @@ These tests use Node's built-in test runner and do not require a running Postgre
 
 ## Security notes
 
-Never commit real credentials or endpoint secrets. The schema's endpoint secret is a starter field; production storage should encrypt secrets at rest and only reveal them at creation time. Before sending requests to customer URLs, implement SSRF protections (block loopback, private, link-local, and metadata IP ranges; validate redirects and DNS resolution).
+Never commit real credentials or endpoint secrets. Endpoint signing secrets are encrypted at rest using AES-256-GCM and returned only at creation or rotation. Never commit real credentials. URL validation blocks local/private IPs and checks DNS at endpoint creation/update time; delivery workers must repeat DNS resolution, validate every redirect, and enforce destination IP checks immediately before sending to mitigate DNS rebinding. Production deployment should also add rate limiting, abuse monitoring, and a key-rotation procedure.
 
 ## License
 
