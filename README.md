@@ -34,8 +34,8 @@ WebHookHub is a developer-first webhook delivery platform built to accept events
 - [x] Add owner-scoped endpoint list, create, update, delete, and secret rotation routes
 - [x] Encrypt endpoint signing secrets at rest with AES-256-GCM
 - [x] Validate endpoint URL schemes, credentials, ports, local/private IPs, and DNS results
-- [x] Add unit tests for endpoint URL validation and secret encryption
-- [ ] Confirm the GitHub Actions test and frontend-build results (workflow is configured on pushes to `main`)
+- [x] Add unit tests for authentication middleware, endpoint URL validation, and secret encryption
+- [ ] Confirm the GitHub Actions test and frontend-build results (workflow is configured on pushes to `main`; local full build is blocked by unavailable package network access)
 - [x] Connect the premium endpoint management screen to login/register and the endpoint API
 - [ ] Add delivery queue workers and re-check DNS/IP at the moment of delivery
 
