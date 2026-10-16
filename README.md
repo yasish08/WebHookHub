@@ -35,8 +35,8 @@ WebHookHub is a developer-first webhook delivery platform built to accept events
 - [x] Encrypt endpoint signing secrets at rest with AES-256-GCM
 - [x] Validate endpoint URL schemes, credentials, ports, local/private IPs, and DNS results
 - [x] Add unit tests for endpoint URL validation and secret encryption
-- [ ] Run the full dependency install, tests, and frontend build in CI
-- [ ] Connect endpoint management screens to the new API
+- [ ] Confirm the GitHub Actions test and frontend-build results (workflow is configured on pushes to `main`)
+- [x] Connect the premium endpoint management screen to login/register and the endpoint API
 - [ ] Add delivery queue workers and re-check DNS/IP at the moment of delivery
 
 Dashboard metric cards, activity chart, endpoint health rows, and recent-delivery table are still **illustrative demo data**. The test-event button now submits a real event to the API; a successful response means the event was stored as accepted, not that it has been delivered to a customer endpoint yet.
@@ -55,7 +55,7 @@ Dashboard metric cards, activity chart, endpoint health rows, and recent-deliver
    npm install
    ```
 
-2. Copy `.env.example` to `.env`, set `DATABASE_URL`, and replace `JWT_SECRET` and `SECRET_ENCRYPTION_KEY` with separate random values of at least 32 characters. Never commit `.env` or real secrets.
+2. Copy `.env.example` to `server/.env`, set `DATABASE_URL`, and generate separate random values for `JWT_SECRET` and `SECRET_ENCRYPTION_KEY` (at least 32 characters each). For example, run `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"` twice and use the two different outputs. Never commit `.env` or real secrets.
 
 3. Generate the Prisma client and apply the schema:
 
