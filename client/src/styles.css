@@ -415,3 +415,28 @@ h1 { margin: 0; color: #f3f1fa; font-size: clamp(24px,2.1vw,31px); font-weight: 
   .hero-live-preview { transform: none; transition: none; }
   .preview-connector i { animation: none; }
 }
+
+
+/* Antigravity-inspired cursor-reactive particles for the opening screen */
+.auth-particle-field {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  pointer-events: none;
+  opacity: .94;
+  mix-blend-mode: screen;
+}
+.auth-showcase > .auth-brand,
+.auth-showcase > .auth-showcase-copy,
+.auth-showcase > .auth-showcase-footer {
+  position: relative;
+  z-index: 1;
+}
+.auth-showcase > .auth-brand { z-index: 2; }
+.auth-showcase > .auth-showcase-copy { pointer-events: none; }
+.auth-showcase > .auth-showcase-copy a,
+.auth-showcase > .auth-showcase-copy button { pointer-events: auto; }
+@media (prefers-reduced-motion: reduce) {
+  .auth-particle-field { opacity: .58; }
+}
