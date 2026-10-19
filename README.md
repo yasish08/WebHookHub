@@ -9,8 +9,8 @@ WebHookHub is a developer-first webhook delivery platform built to accept events
 - **Frontend:** React, JavaScript, Vite
 - **API:** Node.js, Express
 - **Database:** PostgreSQL, Prisma ORM
-- **Planned delivery engine:** Redis-backed queue and workers
-- **Security direction:** HMAC-SHA256 signatures, endpoint validation, scoped authentication
+- **Delivery engine:** Redis + BullMQ queue and a separate Node.js worker
+- **Security:** HMAC-SHA256 signatures, endpoint validation, JWT-scoped endpoint and delivery APIs
 
 ## Build status
 
@@ -37,7 +37,13 @@ WebHookHub is a developer-first webhook delivery platform built to accept events
 - [x] Add unit tests for authentication middleware, endpoint URL validation, and secret encryption
 - [ ] Confirm the GitHub Actions test and frontend-build results (workflow is configured on pushes to `main`; local full build is blocked by unavailable package network access)
 - [x] Connect the premium endpoint management screen to login/register and the endpoint API
-- [ ] Add delivery queue workers and re-check DNS/IP at the moment of delivery
+- [x] Add Redis/BullMQ queue integration to event ingestion
+- [x] Add a separate worker with bounded HTTP timeouts, HMAC-SHA256 signatures and retry backoff
+- [x] Persist delivery attempts, response codes, duration, error text and final event status
+- [x] Recover pending/stale deliveries when the worker restarts or Redis returns
+- [x] Add authenticated delivery history, attempt inspection and replay APIs
+- [x] Connect the dark dashboard delivery history screen to real API data
+- [ ] Run full CI, Redis/PostgreSQL integration tests, and production frontend build
 
 Dashboard metric cards, activity chart, endpoint health rows, and recent-delivery table are still **illustrative demo data**. The test-event button now submits a real event to the API; a successful response means the event was stored as accepted, not that it has been delivered to a customer endpoint yet.
 
@@ -64,13 +70,19 @@ Dashboard metric cards, activity chart, endpoint health rows, and recent-deliver
    npm run db:push
    ```
 
-4. Start the client and API together:
+4. Start PostgreSQL and Redis, then start the client and API together:
 
    ```bash
    npm run dev
    ```
 
-5. Open the dashboard at [http://localhost:5173](http://localhost:5173). API routes are served at [http://localhost:4000/api](http://localhost:4000/api).
+5. In a second terminal, start the background delivery worker:
+
+   ```bash
+   npm run worker
+   ```
+
+6. Open the dashboard at [http://localhost:5173](http://localhost:5173). API routes are served at [http://localhost:4000/api](http://localhost:4000/api).
 
 The API health endpoint is [http://localhost:4000/api/health](http://localhost:4000/api/health). It returns a degraded status until PostgreSQL is configured and reachable.
 
@@ -85,7 +97,7 @@ curl -X POST http://localhost:4000/api/events \
   -d '{"eventType":"payment.succeeded","payload":{"orderId":"ord_123","amount":499}}'
 ```
 
-A new event returns `202 Accepted`. Reusing the same idempotency key returns the previously stored event with `200 OK`. Event ingestion does **not** dispatch webhooks yet; queueing and delivery workers are planned next.
+A new event returns `202 Accepted`. Reusing the same idempotency key returns the previously stored event with `200 OK`. Active endpoints subscribed to the event type (or endpoints subscribed to all event types) receive queued deliveries. The response includes queue state and delivery count; if Redis is unavailable, the event and delivery rows remain persisted and the worker recovery sweep can enqueue them after Redis returns.
 
 Run the current input-validation tests with:
 
@@ -93,7 +105,7 @@ Run the current input-validation tests with:
 npm test
 ```
 
-These tests use Node's built-in test runner and do not require a running PostgreSQL database.
+The unit tests use Node's built-in test runner and do not require a running PostgreSQL database or Redis. Full queue/worker integration still requires both services.
 
 ## API routes
 
@@ -109,7 +121,10 @@ These tests use Node's built-in test runner and do not require a running Postgre
 | PATCH | `/api/endpoints/:id` | Bearer JWT | Update owned endpoint fields |
 | DELETE | `/api/endpoints/:id` | Bearer JWT | Delete an owned endpoint |
 | POST | `/api/endpoints/:id/rotate-secret` | Bearer JWT | Rotate and return a signing secret once |
-| POST | `/api/events` | No (MVP) | Validate and persist an event (requires PostgreSQL) |
+| POST | `/api/events` | No (MVP) | Validate event, create matching deliveries and enqueue work |
+| GET | `/api/deliveries` | Bearer JWT | List the current user's delivery history; optional `?status=FAILED&limit=50` |
+| GET | `/api/deliveries/:id/attempts` | Bearer JWT | Inspect recorded HTTP attempts |
+| POST | `/api/deliveries/:id/replay` | Bearer JWT | Queue a new delivery for the original event and endpoint |
 
 ### Authentication example
 
@@ -144,7 +159,7 @@ The response includes `signingSecret` exactly once. Store it securely. Endpoint 
 
 ## Security notes
 
-Never commit real credentials or endpoint secrets. Endpoint signing secrets are encrypted at rest using AES-256-GCM and returned only at creation or rotation. The MVP `POST /api/events` route is currently unauthenticated; add scoped API keys and rate limiting before exposing it publicly. Never commit real credentials. URL validation blocks local/private IPs and checks DNS at endpoint creation/update time; delivery workers must repeat DNS resolution, validate every redirect, and enforce destination IP checks immediately before sending to mitigate DNS rebinding. Production deployment should also add rate limiting, abuse monitoring, and a key-rotation procedure.
+Never commit real credentials or endpoint secrets. Endpoint signing secrets are encrypted at rest using AES-256-GCM and returned only at creation or rotation. The MVP `POST /api/events` route is currently unauthenticated; add scoped API keys and rate limiting before exposing it publicly. Never commit real credentials. URL validation blocks local/private IPs and checks DNS at endpoint creation/update time; the worker repeats DNS resolution before sending and refuses redirects. DNS can still change between validation and the socket connection, so deploy with network-level egress controls or IP-pinned connection logic before exposing this to untrusted endpoint registrations. Production deployment should also add rate limiting, abuse monitoring, and a key-rotation procedure.
 
 ## License
 
