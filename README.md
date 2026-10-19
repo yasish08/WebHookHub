@@ -75,9 +75,10 @@ When signed in, overview metrics, endpoint rows, recent deliveries, event histor
    npm run db:push
    ```
 
-4. Start PostgreSQL and Redis, then start the client and API together:
+4. Start the local PostgreSQL and Redis services (Docker required), then start the client and API together:
 
    ```bash
+   docker compose up -d
    npm run dev
    ```
 
@@ -89,7 +90,7 @@ When signed in, overview metrics, endpoint rows, recent deliveries, event histor
 
 6. Open the dashboard at [http://localhost:5173](http://localhost:5173). API routes are served at [http://localhost:4000/api](http://localhost:4000/api).
 
-The API health endpoint is [http://localhost:4000/api/health](http://localhost:4000/api/health). It returns a degraded status until both PostgreSQL and Redis are configured and reachable.
+Use `docker compose ps` to confirm PostgreSQL and Redis are healthy; stop them with `docker compose down` (persistent development data remains in named volumes). The API health endpoint is [http://localhost:4000/api/health](http://localhost:4000/api/health). It returns a degraded status until both PostgreSQL and Redis are configured and reachable.
 
 ### Send a test event
 
