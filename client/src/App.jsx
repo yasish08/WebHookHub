@@ -204,7 +204,7 @@ function App() {
               <div className="chart-axis">{(overviewData?.activityByDay || [{ label: "Oct 07" }, { label: "Oct 08" }, { label: "Oct 09" }, { label: "Oct 10" }, { label: "Oct 11" }, { label: "Oct 12" }, { label: "Oct 13" }]).map((day) => <span key={day.date || day.label}>{day.label}</span>)}</div>
             </div>
             <div className="panel endpoint-panel">
-              <div className="panel-heading"><div><h2>Active endpoints</h2><p>Destination health at a glance</p></div><button className="text-button" onClick={() => setActiveNav("Endpoints")}>View all <Icon>→</Icon></button></div>
+              <div className="panel-heading"><div><h2>Endpoints</h2><p>Destination status at a glance</p></div><button className="text-button" onClick={() => setActiveNav("Endpoints")}>View all <Icon>→</Icon></button></div>
               <EndpointRow name="payments-prod" url="api.acme.com/hooks/payments" initials="P" tone="purple" state="Healthy" />
               <EndpointRow name="analytics-pipeline" url="events.acme.io/ingest" initials="A" tone="blue" state="Healthy" />
               <EndpointRow name="crm-sync" url="hooks.acme.io/crm" initials="C" tone="orange" state="Degraded" />
