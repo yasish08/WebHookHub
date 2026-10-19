@@ -58,7 +58,7 @@ test("event history returns delivery outcomes for the authenticated workspace", 
     assert.equal(data.events[0].deliveryCount, 2);
     assert.equal(data.events[0].deliveredCount, 1);
     assert.equal(data.events[0].failedCount, 1);
-    assert.deepEqual(receivedQuery.where, { deliveries: { some: { endpoint: { userId: "user_1" } } } });
+    assert.deepEqual(receivedQuery.where, { userId: "user_1" });
     assert.equal(receivedQuery.take, 50);
   });
 });
