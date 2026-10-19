@@ -16,6 +16,7 @@ export function createOverviewRouter(prisma) {
   router.get("/", async (req, res) => {
     const userId = req.auth.userId;
     const deliveryScope = { endpoint: { userId } };
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
     try {
       const [
@@ -29,6 +30,7 @@ export function createOverviewRouter(prisma) {
         averageDuration,
         endpoints,
         deliveries,
+        activityEvents,
       ] = await Promise.all([
         prisma.endpoint.count({ where: { userId } }),
         prisma.endpoint.count({ where: { userId, status: "ACTIVE" } }),
@@ -54,14 +56,32 @@ export function createOverviewRouter(prisma) {
             endpoint: { select: { id: true, name: true, url: true, status: true } },
           },
         }),
+        prisma.event.findMany({
+          where: { createdAt: { gte: sevenDaysAgo }, deliveries: { some: { endpoint: { userId } } } },
+          select: { createdAt: true },
+          orderBy: { createdAt: "desc" },
+          take: 5000,
+        }),
       ]);
 
       const totalFinished = deliveredCount + failedCount;
+      const dayBuckets = Array.from({ length: 7 }, (_, index) => {
+        const date = new Date();
+        date.setUTCHours(0, 0, 0, 0);
+        date.setUTCDate(date.getUTCDate() - (6 - index));
+        return { date: date.toISOString().slice(0, 10), label: new Intl.DateTimeFormat("en-US", { month: "short", day: "2-digit", timeZone: "UTC" }).format(date), count: 0 };
+      });
+      const bucketByDate = new Map(dayBuckets.map((bucket) => [bucket.date, bucket]));
+      for (const event of activityEvents) {
+        const bucket = bucketByDate.get(new Date(event.createdAt).toISOString().slice(0, 10));
+        if (bucket) bucket.count += 1;
+      }
       return res.json({
         metrics: {
           endpointCount,
           activeEndpointCount,
           eventCount,
+          eventsLast7Days: activityEvents.length,
           deliveredCount,
           retryCount,
           failedCount,
@@ -70,6 +90,7 @@ export function createOverviewRouter(prisma) {
           averageDurationMs: averageDuration._avg.durationMs === null ? null : Math.round(averageDuration._avg.durationMs),
         },
         endpoints,
+        activityByDay: dayBuckets,
         recentDeliveries: deliveries.map((delivery) => ({
           ...delivery,
           timeLabel: relativeTime(delivery.createdAt),
