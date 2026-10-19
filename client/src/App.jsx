@@ -135,7 +135,7 @@ function App() {
         </header>
 
         <div className="page-wrap">
-          {activeNav === "Endpoints" ? <EndpointsManager /> : activeNav === "Deliveries" ? <DeliveriesManager /> : <>
+          {activeNav === "Endpoints" ? <EndpointsManager /> : activeNav === "Deliveries" ? <DeliveriesManager onNavigate={setActiveNav} /> : <>
           <section className="page-heading">
             <div>
               <div className="eyebrow"><span className="eyebrow-line" /> WEBHOOK INFRASTRUCTURE</div>
@@ -411,7 +411,7 @@ function EndpointsManager() {
 }
 
 
-function DeliveriesManager() {
+function DeliveriesManager({ onNavigate }) {
   const [token] = useState(() => sessionStorage.getItem("webhookhub_access_token") || "");
   const [deliveries, setDeliveries] = useState([]);
   const [status, setStatus] = useState("ALL");
@@ -484,7 +484,7 @@ function DeliveriesManager() {
       {error && <div className="manager-alert error-alert" role="alert">{error}</div>}
       {notice && <div className="manager-alert success-alert" role="status">{notice}</div>}
       {!token ? (
-        <section className="panel manager-empty"><strong>Sign in to view delivery history</strong><p>Open Endpoints to register or sign in, then return here.</p><button className="secondary-button" onClick={() => window.dispatchEvent(new CustomEvent("webhookhub:navigate", { detail: "Endpoints" }))}>Go to endpoints</button></section>
+        <section className="panel manager-empty"><strong>Sign in to view delivery history</strong><p>Open Endpoints to register or sign in, then return here.</p><button className="secondary-button" onClick={() => onNavigate("Endpoints")}>Go to endpoints</button></section>
       ) : (
         <section className="panel endpoint-list-panel">
           <div className="panel-heading">
