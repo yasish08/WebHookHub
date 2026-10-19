@@ -24,6 +24,8 @@ function Icon({ children, className = "" }) {
 function App() {
   const [activeNav, setActiveNav] = useState("Overview");
   const [apiState, setApiState] = useState("checking");
+  const [overviewData, setOverviewData] = useState(null);
+  const [overviewError, setOverviewError] = useState("");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All events");
   const [copied, setCopied] = useState(false);
@@ -38,11 +40,42 @@ function App() {
     return () => { alive = false; };
   }, []);
 
-  const visibleDeliveries = useMemo(() => initialDeliveries.filter((item) => {
+  useEffect(() => {
+    let alive = true;
+    const token = sessionStorage.getItem("webhookhub_access_token");
+    if (!token) {
+      setOverviewData(null);
+      setOverviewError("");
+      return () => { alive = false; };
+    }
+    fetch("/api/overview", { headers: { Authorization: `Bearer ${token}` } })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || "Dashboard metrics could not be loaded.");
+        return data;
+      })
+      .then((data) => { if (alive) { setOverviewData(data); setOverviewError(""); } })
+      .catch((error) => { if (alive) setOverviewError(error.message); });
+    return () => { alive = false; };
+  }, [activeNav]);
+
+  const dashboardDeliveries = useMemo(() => overviewData
+    ? overviewData.recentDeliveries.map((delivery) => ({
+        id: delivery.id,
+        destination: delivery.endpoint.name,
+        event: delivery.event.eventType,
+        status: delivery.status === "DELIVERED" ? "Delivered" : delivery.status === "RETRYING" ? "Retrying" : delivery.status === "FAILED" ? "Failed" : delivery.status === "PROCESSING" ? "Processing" : "Pending",
+        code: delivery.responseStatus ?? (delivery.errorMessage ? "ERR" : "—"),
+        time: delivery.timeLabel,
+        latency: delivery.latencyLabel,
+      }))
+    : initialDeliveries, [overviewData]);
+
+  const visibleDeliveries = useMemo(() => dashboardDeliveries.filter((item) => {
     const matchesSearch = `${item.id} ${item.destination} ${item.event}`.toLowerCase().includes(search.toLowerCase());
     const matchesFilter = filter === "All events" || item.status === filter;
     return matchesSearch && matchesFilter;
-  }), [search, filter]);
+  }), [dashboardDeliveries, search, filter]);
 
   const copyEndpoint = async () => {
     try {
@@ -179,7 +212,7 @@ function App() {
 
           <section className="panel deliveries-panel">
             <div className="panel-heading deliveries-heading">
-              <div><h2>Recent deliveries <span className="count-chip">24</span></h2><p>Monitor the latest attempts across your endpoints</p></div>
+              <div><h2>Recent deliveries <span className="count-chip">{overviewData ? overviewData.recentDeliveries.length : 24}</span></h2><p>Monitor the latest attempts across your endpoints</p></div>
               <button className="text-button" onClick={() => setActiveNav("Deliveries")}>View delivery log <Icon>→</Icon></button>
             </div>
             <div className="table-toolbar">
@@ -203,7 +236,7 @@ function App() {
                 </tbody>
               </table>
             </div>
-            <div className="table-footer"><span>Showing <strong>{visibleDeliveries.length}</strong> of 24 deliveries</span><div className="pagination"><button disabled>←</button><button className="page-current">1</button><button>2</button><button>3</button><span>…</span><button>5</button><button>→</button></div></div>
+            <div className="table-footer"><span>Showing <strong>{visibleDeliveries.length}</strong> of {overviewData ? overviewData.recentDeliveries.length : 24} recent deliveries</span><div className="pagination"><button disabled>←</button><button className="page-current">1</button><button>2</button><button>3</button><span>…</span><button>5</button><button>→</button></div></div>
           </section>
 
           <footer className="page-footer"><span>© 2026 WebHookHub</span><span><span className="footer-live-dot" /> All systems operational <span className="footer-separator">·</span> Built for reliable delivery</span><a href="https://github.com/yasish08/WebHookHub" target="_blank" rel="noreferrer">GitHub <Icon>↗</Icon></a></footer>
