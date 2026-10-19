@@ -71,7 +71,7 @@ When signed in, overview metrics, endpoint rows, recent deliveries, event histor
 3. Start the local PostgreSQL and Redis services (Docker required):
 
    ```bash
-   docker compose up -d
+   docker compose up -d --wait
    ```
 
 4. Generate the Prisma client and apply the schema:
