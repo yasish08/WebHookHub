@@ -18,6 +18,8 @@ jobs:
           node-version: 20
       - name: Install dependencies
         run: npm install
+      - name: Generate Prisma client
+        run: npm run db:generate
       - name: Run tests
         run: npm test
       - name: Build frontend
