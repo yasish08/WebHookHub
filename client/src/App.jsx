@@ -111,6 +111,10 @@ function App() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || "Event ingestion failed");
       setTestEventState("sent");
+      fetch("/api/overview", { headers: { Authorization: `Bearer ${token}` } })
+        .then((overviewResponse) => overviewResponse.ok ? overviewResponse.json() : null)
+        .then((overview) => { if (overview) setOverviewData(overview); })
+        .catch(() => {});
       window.setTimeout(() => setTestEventState("idle"), 2500);
     } catch {
       setTestEventState("error");
