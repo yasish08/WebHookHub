@@ -35,23 +35,27 @@ WebHookHub is a developer-first webhook delivery platform built to accept events
 - [x] Encrypt endpoint signing secrets at rest with AES-256-GCM
 - [x] Validate endpoint URL schemes, credentials, ports, local/private IPs, and DNS results
 - [x] Add unit tests for authentication middleware, endpoint URL validation, and secret encryption
-- [ ] Confirm the GitHub Actions test and frontend-build results (workflow is configured on pushes to `main`; local full build is blocked by unavailable package network access)
 - [x] Connect the premium endpoint management screen to login/register and the endpoint API
+
+### Day 4 — Reliable delivery and observability
 - [x] Add Redis/BullMQ queue integration to event ingestion
 - [x] Add a separate worker with bounded HTTP timeouts, HMAC-SHA256 signatures and retry backoff
 - [x] Persist delivery attempts, response codes, duration, error text and final event status
 - [x] Recover pending/stale deliveries when the worker restarts or Redis returns
 - [x] Add authenticated delivery history, attempt inspection and replay APIs
-- [x] Connect the dark dashboard delivery history screen to real API data
-- [ ] Run full CI, Redis/PostgreSQL integration tests, and production frontend build
+- [x] Connect delivery history and event log screens to real API data
+- [x] Add authenticated overview metrics and a seven-day event activity chart
+- [x] Run GitHub Actions unit tests and production frontend build on pushes to main
+- [ ] Add full PostgreSQL/Redis end-to-end tests and deploy the app
 
-Dashboard metric cards, activity chart, endpoint health rows, and recent-delivery table are still **illustrative demo data**. The test-event button now submits a real event to the API; a successful response means the event was stored as accepted, not that it has been delivered to a customer endpoint yet.
+When signed in, overview metrics, endpoint rows, recent deliveries, event history, and the seven-day event chart use workspace data. Preview mode still shows clearly labelled sample metrics. The test-event button submits a real event to the API; a successful response means the event was stored, not necessarily delivered to a customer endpoint.
 
 ## Prerequisites
 
 - Node.js 20 or newer
 - npm 10 or newer
 - PostgreSQL 14 or newer
+- Redis 6 or newer (for BullMQ delivery queue and worker)
 - Redis 6 or newer (for BullMQ delivery queue and worker)
 
 ## Run locally
@@ -117,6 +121,8 @@ The unit tests use Node's built-in test runner and do not require a running Post
 | POST | `/api/auth/register` | No | Create account and return JWT |
 | POST | `/api/auth/login` | No | Verify credentials and return JWT |
 | GET | `/api/auth/me` | Bearer JWT | Return the current account |
+| GET | `/api/overview` | Bearer JWT | User-scoped metrics, endpoint list and seven-day activity |
+| GET | `/api/events` | Bearer JWT | List recent events and their workspace delivery outcomes |
 | GET | `/api/endpoints` | Bearer JWT | List the current user's endpoints |
 | POST | `/api/endpoints` | Bearer JWT | Create endpoint; signing secret is returned once |
 | PATCH | `/api/endpoints/:id` | Bearer JWT | Update owned endpoint fields |
@@ -150,13 +156,13 @@ The response includes `signingSecret` exactly once. Store it securely. Endpoint 
 
 ## Product roadmap
 
-1. Workspace setup and dashboard foundation
-2. Authentication and endpoint management
-3. Event ingestion and validation
-4. Redis queue and asynchronous delivery worker
-5. HMAC signing, retries with exponential backoff and jitter
-6. Delivery history, replay, and observability
-7. Tests, security hardening, deployment, and documentation
+1. [x] Workspace setup and dashboard foundation
+2. [x] Authentication and endpoint management
+3. [x] Event ingestion and validation
+4. [x] Redis queue and asynchronous delivery worker
+5. [x] HMAC signing, retries with exponential backoff and jitter
+6. [x] Delivery history, replay, and observability
+7. [ ] PostgreSQL/Redis end-to-end tests, security hardening, deployment, and documentation
 
 ## Security notes
 
