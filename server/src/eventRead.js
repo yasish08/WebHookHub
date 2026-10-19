@@ -9,7 +9,7 @@ export function createEventReadRouter(prisma) {
     const limit = Number.isFinite(parsedLimit) ? Math.min(100, Math.max(1, parsedLimit)) : 30;
     try {
       const events = await prisma.event.findMany({
-        where: { deliveries: { some: { endpoint: { userId: req.auth.userId } } } },
+        where: { userId: req.auth.userId },
         orderBy: { createdAt: "desc" },
         take: limit,
         select: {
