@@ -68,27 +68,32 @@ When signed in, overview metrics, endpoint rows, recent deliveries, event histor
 
 2. Copy `.env.example` to `server/.env`, set `DATABASE_URL`, and generate separate random values for `JWT_SECRET` and `SECRET_ENCRYPTION_KEY` (at least 32 characters each). For example, run `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"` twice and use the two different outputs. Never commit `.env` or real secrets.
 
-3. Generate the Prisma client and apply the schema:
+3. Start the local PostgreSQL and Redis services (Docker required):
+
+   ```bash
+   docker compose up -d
+   ```
+
+4. Generate the Prisma client and apply the schema:
 
    ```bash
    npm run db:generate
    npm run db:push
    ```
 
-4. Start the local PostgreSQL and Redis services (Docker required), then start the client and API together:
+5. Start the client and API together:
 
    ```bash
-   docker compose up -d
    npm run dev
    ```
 
-5. In a second terminal, start the background delivery worker:
+6. In a second terminal, start the background delivery worker:
 
    ```bash
    npm run worker
    ```
 
-6. Open the dashboard at [http://localhost:5173](http://localhost:5173). API routes are served at [http://localhost:4000/api](http://localhost:4000/api).
+7. Open the dashboard at [http://localhost:5173](http://localhost:5173). API routes are served at [http://localhost:4000/api](http://localhost:4000/api).
 
 Use `docker compose ps` to confirm PostgreSQL and Redis are healthy; stop them with `docker compose down` (persistent development data remains in named volumes). The API health endpoint is [http://localhost:4000/api/health](http://localhost:4000/api/health). It returns a degraded status until both PostgreSQL and Redis are configured and reachable.
 
