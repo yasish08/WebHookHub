@@ -9,13 +9,39 @@ import {
   createWebhookSignature,
   DELIVERY_TIMEOUT_MS,
   MAX_DELIVERY_ATTEMPTS,
+  MAX_RESPONSE_BODY_LENGTH,
   shouldRetryStatus,
-  truncateResponseBody,
 } from "./webhookHelpers.js";
 
 const prisma = new PrismaClient();
 const port = Number(process.env.WORKER_CONCURRENCY || 8);
 let shuttingDown = false;
+
+async function readLimitedResponseBody(response) {
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let totalBytes = 0;
+  let result = "";
+  try {
+    while (totalBytes < MAX_RESPONSE_BODY_LENGTH) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const remaining = MAX_RESPONSE_BODY_LENGTH - totalBytes;
+      const chunk = value.byteLength > remaining ? value.subarray(0, remaining) : value;
+      result += decoder.decode(chunk, { stream: true });
+      totalBytes += chunk.byteLength;
+      if (value.byteLength > remaining) {
+        await reader.cancel().catch(() => {});
+        break;
+      }
+    }
+    result += decoder.decode();
+  } finally {
+    reader.releaseLock();
+  }
+  return result;
+}
 
 async function processDelivery(job) {
   const { deliveryId } = job.data;
@@ -83,7 +109,7 @@ async function processDelivery(job) {
       body: rawBody,
     });
     responseStatus = response.status;
-    responseBody = truncateResponseBody(await response.text().catch(() => ""));
+    responseBody = await readLimitedResponseBody(response);
     succeeded = response.ok;
     if (!succeeded) errorMessage = `Endpoint returned HTTP ${response.status}`;
   } catch (error) {
