@@ -22,6 +22,7 @@ function Icon({ children, className = "" }) {
 }
 
 function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(sessionStorage.getItem("webhookhub_access_token")));
   const [activeNav, setActiveNav] = useState("Overview");
   const [apiState, setApiState] = useState("checking");
   const [overviewData, setOverviewData] = useState(null);
@@ -122,6 +123,10 @@ function App() {
     }
   };
 
+  if (!isAuthenticated) {
+    return <AuthScreen onAuthenticated={() => { setIsAuthenticated(true); setActiveNav("Overview"); }} />;
+  }
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -175,7 +180,7 @@ function App() {
         </header>
 
         <div className="page-wrap">
-          {activeNav === "Endpoints" ? <EndpointsManager /> : activeNav === "Deliveries" ? <DeliveriesManager onNavigate={setActiveNav} /> : activeNav === "Event log" ? <EventLogManager onNavigate={setActiveNav} /> : <>
+          {activeNav === "Endpoints" ? <EndpointsManager onSignOut={() => { setIsAuthenticated(false); setActiveNav("Overview"); }} /> : activeNav === "Deliveries" ? <DeliveriesManager onNavigate={setActiveNav} /> : activeNav === "Event log" ? <EventLogManager onNavigate={setActiveNav} /> : <>
           <section className="page-heading">
             <div>
               <div className="eyebrow"><span className="eyebrow-line" /> WEBHOOK INFRASTRUCTURE</div>
@@ -257,7 +262,80 @@ function App() {
 }
 
 
-function EndpointsManager() {
+
+function AuthScreen({ onAuthenticated }) {
+  const [mode, setMode] = useState("login");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const submit = async (event) => {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/auth/${mode === "register" ? "register" : "login"}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), password, ...(mode === "register" ? { name: name.trim() } : {}) }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || "Authentication failed. Please try again.");
+      if (!data.accessToken) throw new Error("The server did not return an access token.");
+      sessionStorage.setItem("webhookhub_access_token", data.accessToken);
+      onAuthenticated();
+    } catch (err) {
+      setError(err.message || "Could not connect to WebHookHub. Check that the API is running.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <main className="auth-screen">
+      <section className="auth-showcase">
+        <a className="brand auth-brand" href="/" aria-label="WebHookHub home">
+          <span className="brand-mark"><span /><span /><span /></span>
+          <span>webhook<span className="brand-light">hub</span></span>
+        </a>
+        <div className="auth-showcase-copy">
+          <div className="eyebrow"><span className="eyebrow-line" /> RELIABLE WEBHOOK INFRASTRUCTURE</div>
+          <h1>Every event.<br /><span>Delivered.</span></h1>
+          <p>One place to manage endpoints, observe delivery attempts, and recover from failures with confidence.</p>
+          <div className="auth-feature-list">
+            <div><span>✓</span><div><strong>Reliable delivery</strong><p>Automatic retries and delivery history.</p></div></div>
+            <div><span>↗</span><div><strong>Full visibility</strong><p>Track events from ingestion to response.</p></div></div>
+            <div><span>⌘</span><div><strong>Built for developers</strong><p>Secure endpoints with signed webhooks.</p></div></div>
+          </div>
+        </div>
+        <p className="auth-showcase-footer">© 2026 WebHookHub · Built for reliable delivery</p>
+      </section>
+      <section className="auth-form-side">
+        <div className="auth-form-wrap">
+          <div className="auth-mobile-brand"><span className="brand-mark"><span /><span /><span /></span> webhook<span className="brand-light">hub</span></div>
+          <div className="auth-form-heading">
+            <span className="auth-kicker">{mode === "login" ? "WELCOME BACK" : "GET STARTED"}</span>
+            <h2>{mode === "login" ? "Sign in to your workspace" : "Create your account"}</h2>
+            <p>{mode === "login" ? "Enter your details to continue to WebHookHub." : "Start managing reliable webhook delivery in minutes."}</p>
+          </div>
+          {error && <div className="manager-alert error-alert" role="alert">{error}</div>}
+          <form className="manager-form auth-form auth-screen-form" onSubmit={submit}>
+            {mode === "register" && <label>Display name<input value={name} onChange={(event) => setName(event.target.value)} required maxLength={80} placeholder="Your name" autoComplete="name" /></label>}
+            <label>Email address<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required maxLength={254} placeholder="you@company.com" autoComplete="email" /></label>
+            <label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={10} maxLength={128} placeholder="At least 10 characters" autoComplete={mode === "login" ? "current-password" : "new-password"} /></label>
+            <button className="primary-button auth-submit" type="submit" disabled={busy}>{busy ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"} <span>→</span></button>
+          </form>
+          <p className="auth-switch">{mode === "login" ? "Don't have an account?" : "Already have an account?"} <button type="button" onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(""); }}>{mode === "login" ? "Create an account" : "Sign in instead"}</button></p>
+          <p className="auth-security-note"><span>⌑</span> Your workspace data is protected by authenticated API access.</p>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function EndpointsManager({ onSignOut }) {
   const [token, setToken] = useState(() => sessionStorage.getItem("webhookhub_access_token") || "");
   const [authMode, setAuthMode] = useState("login");
   const [email, setEmail] = useState("");
@@ -396,6 +474,7 @@ function EndpointsManager() {
     setRevealedSecret("");
     setNotice("Signed out.");
     setError("");
+    onSignOut?.();
   };
 
   return (
