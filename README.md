@@ -98,11 +98,12 @@ With the API running and PostgreSQL configured, submit an event:
 ```bash
 curl -X POST http://localhost:4000/api/events \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token>" \
   -H "Idempotency-Key: demo-payment-001" \
   -d '{"eventType":"payment.succeeded","payload":{"orderId":"ord_123","amount":499}}'
 ```
 
-A new event returns `202 Accepted`. Reusing the same idempotency key returns the previously stored event with `200 OK`. Active endpoints subscribed to the event type (or endpoints subscribed to all event types) receive queued deliveries. The response includes queue state and delivery count; if Redis is unavailable, the event and delivery rows remain persisted and the worker recovery sweep can enqueue them after Redis returns.
+A new event returns `202 Accepted`. Reusing the same idempotency key for the same user returns the previously stored event with `200 OK`; idempotency keys are isolated per user. Active endpoints subscribed to the event type (or endpoints subscribed to all event types) receive queued deliveries. The response includes queue state and delivery count; if Redis is unavailable, the event and delivery rows remain persisted and the worker recovery sweep can enqueue them after Redis returns.
 
 Run the current input-validation tests with:
 
@@ -128,7 +129,7 @@ The unit tests use Node's built-in test runner and do not require a running Post
 | PATCH | `/api/endpoints/:id` | Bearer JWT | Update owned endpoint fields |
 | DELETE | `/api/endpoints/:id` | Bearer JWT | Delete an owned endpoint |
 | POST | `/api/endpoints/:id/rotate-secret` | Bearer JWT | Rotate and return a signing secret once |
-| POST | `/api/events` | No (MVP) | Validate event, create matching deliveries and enqueue work |
+| POST | `/api/events` | Bearer JWT | Validate event, create matching deliveries and enqueue work for the current user |
 | GET | `/api/deliveries` | Bearer JWT | List the current user's delivery history; optional `?status=FAILED&limit=50` |
 | GET | `/api/deliveries/:id/attempts` | Bearer JWT | Inspect recorded HTTP attempts |
 | POST | `/api/deliveries/:id/replay` | Bearer JWT | Queue a new delivery for the original event and endpoint |
@@ -166,7 +167,7 @@ The response includes `signingSecret` exactly once. Store it securely. Endpoint 
 
 ## Security notes
 
-Never commit real credentials or endpoint secrets. Endpoint signing secrets are encrypted at rest using AES-256-GCM and returned only at creation or rotation. The MVP `POST /api/events` route is currently unauthenticated; add scoped API keys and rate limiting before exposing it publicly. URL validation blocks local/private IPs and checks DNS at endpoint creation/update time; the worker repeats DNS resolution before sending and refuses redirects. DNS can still change between validation and the socket connection, so deploy with network-level egress controls or IP-pinned connection logic before exposing this to untrusted endpoint registrations. Production deployment should also add rate limiting, abuse monitoring, and a key-rotation procedure.
+Never commit real credentials or endpoint secrets. Endpoint signing secrets are encrypted at rest using AES-256-GCM and returned only at creation or rotation. Event ingestion requires a valid Bearer JWT and only dispatches to endpoints owned by that user. For external production integrations, add scoped API keys and rate limiting rather than sharing a user access token. URL validation blocks local/private IPs and checks DNS at endpoint creation/update time; the worker repeats DNS resolution before sending and refuses redirects. DNS can still change between validation and the socket connection, so deploy with network-level egress controls or IP-pinned connection logic before exposing this to untrusted endpoint registrations. Production deployment should also add rate limiting, abuse monitoring, and a key-rotation procedure.
 
 ## License
 
