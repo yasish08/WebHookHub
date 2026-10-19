@@ -37,7 +37,7 @@ export function createOverviewRouter(prisma) {
       ] = await Promise.all([
         prisma.endpoint.count({ where: { userId } }),
         prisma.endpoint.count({ where: { userId, status: "ACTIVE" } }),
-        prisma.event.count({ where: { deliveries: { some: { endpoint: { userId } } } } }),
+        prisma.event.count({ where: { userId } }),
         prisma.delivery.count({ where: { ...deliveryScope, status: "DELIVERED" } }),
         prisma.delivery.count({ where: { ...deliveryScope, status: "RETRYING" } }),
         prisma.delivery.count({ where: { ...deliveryScope, status: "FAILED" } }),
@@ -59,9 +59,9 @@ export function createOverviewRouter(prisma) {
             endpoint: { select: { id: true, name: true, url: true, status: true } },
           },
         }),
-        prisma.event.count({ where: { createdAt: { gte: sevenDaysAgo }, deliveries: { some: { endpoint: { userId } } } } }),
+        prisma.event.count({ where: { userId, createdAt: { gte: sevenDaysAgo } } }),
         prisma.event.findMany({
-          where: { createdAt: { gte: sevenDaysAgo }, deliveries: { some: { endpoint: { userId } } } },
+          where: { userId, createdAt: { gte: sevenDaysAgo } },
           select: { createdAt: true },
           orderBy: { createdAt: "desc" },
           take: 5000,
