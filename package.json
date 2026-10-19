@@ -14,7 +14,8 @@
     "build": "npm run build --workspace client",
     "db:generate": "npm run db:generate --workspace server",
     "db:push": "npm run db:push --workspace server",
-    "test": "npm test --workspaces --if-present"
+    "test": "npm test --workspaces --if-present",
+    "worker": "npm run worker --workspace server"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
