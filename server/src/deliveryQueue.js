@@ -22,6 +22,7 @@ export async function enqueueDelivery(deliveryId, delay = 0, attemptNumber = 1) 
   return getDeliveryQueue().add("deliver", { deliveryId }, {
     jobId: `delivery-${deliveryId}-attempt-${attemptNumber}`,
     delay: Math.max(0, Math.floor(delay)),
+    removeOnComplete: true,
   });
 }
 
