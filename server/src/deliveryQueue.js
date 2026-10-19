@@ -19,11 +19,22 @@ export function getDeliveryQueue() {
 
 export async function enqueueDelivery(deliveryId, delay = 0, attemptNumber = 1) {
   if (!deliveryId) throw new TypeError("A delivery ID is required.");
-  return getDeliveryQueue().add("deliver", { deliveryId }, {
+  const addPromise = getDeliveryQueue().add("deliver", { deliveryId }, {
     jobId: `delivery-${deliveryId}-attempt-${attemptNumber}`,
     delay: Math.max(0, Math.floor(delay)),
     removeOnComplete: true,
   });
+  let timeout;
+  try {
+    return await Promise.race([
+      addPromise,
+      new Promise((_, reject) => {
+        timeout = setTimeout(() => reject(new Error("Timed out while enqueueing delivery in Redis.")), 4000);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function pingRedis() {
