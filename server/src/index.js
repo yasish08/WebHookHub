@@ -115,6 +115,7 @@ app.post("/api/events", async (req, res) => {
           eventType: validation.value.eventType,
           payload: validation.value.payload,
           idempotencyKey: validation.value.idempotencyKey,
+          status: endpoints.length ? "ACCEPTED" : "COMPLETED",
           deliveries: endpoints.length ? {
             create: endpoints.map((endpoint) => ({ endpointId: endpoint.id })),
           } : undefined,
