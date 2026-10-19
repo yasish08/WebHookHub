@@ -58,7 +58,7 @@ function App() {
       .then((data) => { if (alive) { setOverviewData(data); setOverviewError(""); } })
       .catch((error) => { if (alive) setOverviewError(error.message); });
     return () => { alive = false; };
-  }, [activeNav]);
+  }, [activeNav, isAuthenticated]);
 
   const dashboardDeliveries = useMemo(() => overviewData
     ? overviewData.recentDeliveries.map((delivery) => ({
