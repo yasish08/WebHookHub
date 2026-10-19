@@ -130,6 +130,19 @@ async function processDelivery(job) {
     }
   }
 
+  const unfinishedCount = await prisma.delivery.count({
+    where: { eventId: delivery.eventId, status: { in: ["PENDING", "PROCESSING", "RETRYING"] } },
+  });
+  if (unfinishedCount === 0) {
+    const failedCount = await prisma.delivery.count({
+      where: { eventId: delivery.eventId, status: "FAILED" },
+    });
+    await prisma.event.update({
+      where: { id: delivery.eventId },
+      data: { status: failedCount ? "FAILED" : "COMPLETED" },
+    });
+  }
+
   console.log(JSON.stringify({
     event: "webhook_delivery_attempt",
     deliveryId: delivery.id,
