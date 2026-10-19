@@ -69,19 +69,21 @@ async function queuePendingDeliveries(eventId) {
   const deliveries = await prisma.delivery.findMany({
     where: { eventId, status: { in: ["PENDING", "RETRYING"] } },
     select: { id: true, attemptCount: true, nextAttemptAt: true },
+    take: 200,
+    orderBy: { createdAt: "asc" },
   });
-  let queued = 0;
-  let failed = 0;
-  for (const delivery of deliveries) {
-    if (delivery.nextAttemptAt && delivery.nextAttemptAt > now) continue;
+  const due = deliveries.filter((delivery) => !delivery.nextAttemptAt || delivery.nextAttemptAt <= now);
+  const results = await Promise.all(due.map(async (delivery) => {
     try {
       await enqueueDelivery(delivery.id, 0, Math.max(1, delivery.attemptCount + 1));
-      queued += 1;
+      return true;
     } catch (error) {
-      failed += 1;
       console.error("[api:queue_error]", { deliveryId: delivery.id, message: error?.message });
+      return false;
     }
-  }
+  }));
+  const queued = results.filter(Boolean).length;
+  const failed = results.length - queued;
   return { queued, failed };
 }
 
