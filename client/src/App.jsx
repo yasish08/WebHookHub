@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 const navItems = [
   { label: "Overview", icon: "◫" },
@@ -9,6 +9,120 @@ const navItems = [
 
 function Icon({ children, className = "" }) {
   return <span aria-hidden="true" className={`icon ${className}`}>{children}</span>;
+}
+
+function ParticleField() {
+  const canvasRef = React.useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const host = canvas?.parentElement;
+    if (!canvas || !host) return undefined;
+    const context = canvas.getContext("2d");
+    if (!context) return undefined;
+
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let width = 0;
+    let height = 0;
+    let frame = 0;
+    let particles = [];
+    const pointer = { x: -1000, y: -1000 };
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    const resize = () => {
+      const rect = host.getBoundingClientRect();
+      width = rect.width;
+      height = rect.height;
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      context.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const count = Math.min(105, Math.max(38, Math.floor((width * height) / 10500)));
+      particles = Array.from({ length: count }, () => ({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        vx: (Math.random() - 0.5) * 0.34,
+        vy: (Math.random() - 0.5) * 0.34,
+        radius: Math.random() * 1.5 + 0.6,
+        alpha: Math.random() * 0.42 + 0.18,
+      }));
+    };
+
+    const onPointerMove = (event) => {
+      const rect = canvas.getBoundingClientRect();
+      pointer.x = event.clientX - rect.left;
+      pointer.y = event.clientY - rect.top;
+    };
+    const onPointerLeave = () => { pointer.x = -1000; pointer.y = -1000; };
+
+    const draw = () => {
+      context.clearRect(0, 0, width, height);
+      for (let i = 0; i < particles.length; i += 1) {
+        const p = particles[i];
+        if (!reduceMotion) {
+          const dx = p.x - pointer.x;
+          const dy = p.y - pointer.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          if (distance < 125 && distance > 0) {
+            const force = (125 - distance) / 125;
+            p.vx += (dx / distance) * force * 0.018;
+            p.vy += (dy / distance) * force * 0.018;
+          }
+          p.vx += (Math.random() - 0.5) * 0.006;
+          p.vy += (Math.random() - 0.5) * 0.006;
+          p.vx *= 0.994;
+          p.vy *= 0.994;
+          p.x += p.vx;
+          p.y += p.vy;
+          if (p.x < -4) p.x = width + 4;
+          if (p.x > width + 4) p.x = -4;
+          if (p.y < -4) p.y = height + 4;
+          if (p.y > height + 4) p.y = -4;
+        }
+        for (let j = i + 1; j < particles.length; j += 1) {
+          const q = particles[j];
+          const dx = p.x - q.x;
+          const dy = p.y - q.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          if (distance < 94) {
+            const alpha = (1 - distance / 94) * 0.15;
+            context.strokeStyle = `rgba(169, 139, 255, ${alpha})`;
+            context.lineWidth = 0.7;
+            context.beginPath();
+            context.moveTo(p.x, p.y);
+            context.lineTo(q.x, q.y);
+            context.stroke();
+          }
+        }
+        const glow = Math.hypot(p.x - pointer.x, p.y - pointer.y) < 125;
+        context.beginPath();
+        context.fillStyle = glow
+          ? `rgba(205, 185, 255, ${Math.min(1, p.alpha + 0.4)})`
+          : `rgba(166, 139, 255, ${p.alpha})`;
+        context.shadowBlur = glow ? 11 : 4;
+        context.shadowColor = "rgba(153, 115, 255, .65)";
+        context.arc(p.x, p.y, glow ? p.radius + 0.5 : p.radius, 0, Math.PI * 2);
+        context.fill();
+      }
+      context.shadowBlur = 0;
+      if (!reduceMotion) frame = window.requestAnimationFrame(draw);
+    };
+
+    resize();
+    draw();
+    window.addEventListener("resize", resize);
+    host.addEventListener("pointermove", onPointerMove);
+    host.addEventListener("pointerleave", onPointerLeave);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", resize);
+      host.removeEventListener("pointermove", onPointerMove);
+      host.removeEventListener("pointerleave", onPointerLeave);
+    };
+  }, []);
+
+  return <canvas ref={canvasRef} className="auth-particle-field" aria-hidden="true" />;
 }
 
 function App() {
@@ -294,6 +408,7 @@ function AuthScreen({ onAuthenticated }) {
   return (
     <main className="auth-screen">
       <section className="auth-showcase" onPointerMove={moveShowcase}>
+        <ParticleField />
         <a className="brand auth-brand" href="/" aria-label="WebHookHub home">
           <span className="brand-mark"><span /><span /><span /></span>
           <span>webhook<span className="brand-light">hub</span></span>
