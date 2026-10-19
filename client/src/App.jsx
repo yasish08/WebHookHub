@@ -135,7 +135,7 @@ function App() {
         </header>
 
         <div className="page-wrap">
-          {activeNav === "Endpoints" ? <EndpointsManager /> : <>
+          {activeNav === "Endpoints" ? <EndpointsManager /> : activeNav === "Deliveries" ? <DeliveriesManager /> : <>
           <section className="page-heading">
             <div>
               <div className="eyebrow"><span className="eyebrow-line" /> WEBHOOK INFRASTRUCTURE</div>
@@ -405,6 +405,112 @@ function EndpointsManager() {
             ))}
           </section>
         </>
+      )}
+    </div>
+  );
+}
+
+
+function DeliveriesManager() {
+  const [token] = useState(() => sessionStorage.getItem("webhookhub_access_token") || "");
+  const [deliveries, setDeliveries] = useState([]);
+  const [status, setStatus] = useState("ALL");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [selectedId, setSelectedId] = useState("");
+  const [attempts, setAttempts] = useState([]);
+
+  const load = async () => {
+    if (!token) return;
+    setLoading(true);
+    setError("");
+    try {
+      const query = status === "ALL" ? "" : `?status=${encodeURIComponent(status)}`;
+      const response = await fetch(`/api/deliveries${query}`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Delivery history could not be loaded.");
+      setDeliveries(data.deliveries || []);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, [token, status]);
+
+  const viewAttempts = async (deliveryId) => {
+    if (selectedId === deliveryId) {
+      setSelectedId("");
+      setAttempts([]);
+      return;
+    }
+    setSelectedId(deliveryId);
+    setError("");
+    try {
+      const response = await fetch(`/api/deliveries/${deliveryId}/attempts`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Attempts could not be loaded.");
+      setAttempts(data.attempts || []);
+    } catch (err) { setError(err.message); }
+  };
+
+  const replay = async (deliveryId) => {
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch(`/api/deliveries/${deliveryId}/replay`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Replay failed.");
+      setNotice(data.message || "Replay queued.");
+      await load();
+    } catch (err) { setError(err.message); }
+  };
+
+  return (
+    <div className="endpoint-manager delivery-manager">
+      <section className="page-heading endpoint-manager-heading">
+        <div>
+          <div className="eyebrow"><span className="eyebrow-line" /> DELIVERY OBSERVABILITY</div>
+          <h1>Delivery history<span className="heading-period">.</span></h1>
+          <p className="subtitle">Inspect real delivery attempts, response codes and retry state.</p>
+        </div>
+        <button className="secondary-button" onClick={load} disabled={loading}><Icon>↻</Icon>{loading ? "Refreshing…" : "Refresh"}</button>
+      </section>
+      {error && <div className="manager-alert error-alert" role="alert">{error}</div>}
+      {notice && <div className="manager-alert success-alert" role="status">{notice}</div>}
+      {!token ? (
+        <section className="panel manager-empty"><strong>Sign in to view delivery history</strong><p>Open Endpoints to register or sign in, then return here.</p><button className="secondary-button" onClick={() => window.dispatchEvent(new CustomEvent("webhookhub:navigate", { detail: "Endpoints" }))}>Go to endpoints</button></section>
+      ) : (
+        <section className="panel endpoint-list-panel">
+          <div className="panel-heading">
+            <div><h2>Recent attempts <span className="count-chip">{deliveries.length}</span></h2><p>Showing up to 50 of your most recent deliveries.</p></div>
+            <label className="filter-select"><span className="sr-only">Filter delivery status</span><select value={status} onChange={(event) => setStatus(event.target.value)}><option value="ALL">All statuses</option><option value="PENDING">Pending</option><option value="PROCESSING">Processing</option><option value="DELIVERED">Delivered</option><option value="RETRYING">Retrying</option><option value="FAILED">Failed</option></select><Icon>⌄</Icon></label>
+          </div>
+          {deliveries.length === 0 ? <div className="manager-empty"><span className="empty-mark">↗</span><strong>{loading ? "Loading deliveries…" : "No deliveries yet"}</strong><p>When an event matches an active endpoint, its delivery and every attempt will appear here.</p></div> : (
+            <div className="real-delivery-list">
+              {deliveries.map((delivery) => (
+                <article className="real-delivery" key={delivery.id}>
+                  <div className="real-delivery-main">
+                    <div className="real-delivery-title"><strong>{delivery.event.eventType}</strong><span className={`delivery-state state-${delivery.status.toLowerCase()}`}>{delivery.status}</span></div>
+                    <div className="real-delivery-meta"><span>{delivery.endpoint.name}</span><code>{delivery.id}</code></div>
+                    <div className="real-delivery-meta"><span>{delivery.responseStatus ? `HTTP ${delivery.responseStatus}` : delivery.errorMessage || "Waiting for attempt"}</span><span>{delivery.durationMs == null ? "—" : `${delivery.durationMs} ms`}</span><span>{delivery.attemptCount} attempt(s)</span><span>{new Date(delivery.createdAt).toLocaleString()}</span></div>
+                    {delivery.errorMessage && <p className="delivery-error-text">{delivery.errorMessage}</p>}
+                    {selectedId === delivery.id && <div className="attempt-timeline">{attempts.length ? attempts.map((attempt) => <div className="attempt-entry" key={attempt.id}><span className="attempt-number">#{attempt.attemptNumber}</span><div><strong>{attempt.responseStatus ? `HTTP ${attempt.responseStatus}` : "Request error"}</strong><p>{attempt.errorMessage || attempt.responseBody || "No response body"}</p></div><span>{attempt.durationMs == null ? "—" : `${attempt.durationMs} ms`}</span></div>) : <p className="auth-note">No recorded attempts yet.</p>}</div>}
+                  </div>
+                  <div className="real-delivery-actions">
+                    <button className="secondary-button" onClick={() => viewAttempts(delivery.id)}>{selectedId === delivery.id ? "Hide attempts" : "View attempts"}</button>
+                    <button className="secondary-button" onClick={() => replay(delivery.id)} disabled={delivery.status === "PROCESSING" || delivery.status === "PENDING"}>Replay</button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
       )}
     </div>
   );
