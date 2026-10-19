@@ -8,6 +8,7 @@ import { createEndpointRouter } from "./endpoints.js";
 import { createDeliveryRouter } from "./deliveries.js";
 import { createOverviewRouter } from "./overview.js";
 import { createEventReadRouter } from "./eventRead.js";
+import { requireAuth } from "./auth.js";
 import { enqueueDelivery, pingRedis, closeDeliveryQueue } from "./deliveryQueue.js";
 
 const app = express();
@@ -87,7 +88,7 @@ async function queuePendingDeliveries(eventId) {
   return { queued, failed };
 }
 
-app.post("/api/events", async (req, res) => {
+app.post("/api/events", requireAuth, async (req, res) => {
   const headerKey = req.get("Idempotency-Key");
   const bodyKey = typeof req.body?.idempotencyKey === "string" ? req.body.idempotencyKey : undefined;
   const rawKey = headerKey ?? bodyKey;
@@ -106,7 +107,7 @@ app.post("/api/events", async (req, res) => {
     let duplicate = false;
     if (validation.value.idempotencyKey) {
       event = await prisma.event.findUnique({
-        where: { idempotencyKey: validation.value.idempotencyKey },
+        where: { userId_idempotencyKey: { userId: req.auth.userId, idempotencyKey: validation.value.idempotencyKey } },
         select: { id: true, eventType: true, status: true, createdAt: true },
       });
       duplicate = Boolean(event);
@@ -115,6 +116,7 @@ app.post("/api/events", async (req, res) => {
     if (!event) {
       const endpoints = await prisma.endpoint.findMany({
         where: {
+          userId: req.auth.userId,
           status: "ACTIVE",
           OR: [{ eventTypes: { isEmpty: true } }, { eventTypes: { has: validation.value.eventType } }],
         },
@@ -126,6 +128,7 @@ app.post("/api/events", async (req, res) => {
           eventType: validation.value.eventType,
           payload: validation.value.payload,
           idempotencyKey: validation.value.idempotencyKey,
+          userId: req.auth.userId,
           status: endpoints.length ? "ACCEPTED" : "COMPLETED",
           deliveries: endpoints.length ? {
             create: endpoints.map((endpoint) => ({ endpointId: endpoint.id })),
@@ -152,7 +155,7 @@ app.post("/api/events", async (req, res) => {
     if (error?.code === "P2002" && validation.value.idempotencyKey) {
       try {
         const existing = await prisma.event.findUnique({
-          where: { idempotencyKey: validation.value.idempotencyKey },
+          where: { userId_idempotencyKey: { userId: req.auth.userId, idempotencyKey: validation.value.idempotencyKey } },
           select: { id: true, eventType: true, status: true, createdAt: true },
         });
         if (existing) {
