@@ -168,7 +168,7 @@ function App() {
         </header>
 
         <div className="page-wrap">
-          {activeNav === "Endpoints" ? <EndpointsManager /> : activeNav === "Deliveries" ? <DeliveriesManager onNavigate={setActiveNav} /> : <>
+          {activeNav === "Endpoints" ? <EndpointsManager /> : activeNav === "Deliveries" ? <DeliveriesManager onNavigate={setActiveNav} /> : activeNav === "Event log" ? <EventLogManager onNavigate={setActiveNav} /> : <>
           <section className="page-heading">
             <div>
               <div className="eyebrow"><span className="eyebrow-line" /> WEBHOOK INFRASTRUCTURE</div>
@@ -443,6 +443,65 @@ function EndpointsManager() {
   );
 }
 
+
+
+function EventLogManager({ onNavigate }) {
+  const [token] = useState(() => sessionStorage.getItem("webhookhub_access_token") || "");
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [expandedId, setExpandedId] = useState("");
+
+  const load = async () => {
+    if (!token) return;
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch("/api/events?limit=50", { headers: { Authorization: `Bearer ${token}` } });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Event history could not be loaded.");
+      setEvents(data.events || []);
+    } catch (err) { setError(err.message); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { load(); }, [token]);
+
+  const visibleEvents = events.filter((event) => `${event.id} ${event.eventType} ${event.status}`.toLowerCase().includes(search.toLowerCase()));
+
+  return (
+    <div className="endpoint-manager event-log-manager">
+      <section className="page-heading endpoint-manager-heading">
+        <div><div className="eyebrow"><span className="eyebrow-line" /> EVENT INGESTION</div><h1>Event log<span className="heading-period">.</span></h1><p className="subtitle">Inspect accepted events, payloads and their delivery outcomes.</p></div>
+        <button className="secondary-button" onClick={load} disabled={loading}><Icon>↻</Icon>{loading ? "Refreshing…" : "Refresh"}</button>
+      </section>
+      {error && <div className="manager-alert error-alert" role="alert">{error}</div>}
+      {!token ? (
+        <section className="panel manager-empty"><strong>Sign in to view event history</strong><p>Your event log is scoped to your workspace endpoints.</p><button className="secondary-button" onClick={() => onNavigate("Endpoints")}>Go to endpoints</button></section>
+      ) : (
+        <section className="panel endpoint-list-panel">
+          <div className="panel-heading"><div><h2>Recent events <span className="count-chip">{visibleEvents.length}</span></h2><p>Showing up to 50 events associated with your endpoints.</p></div><label className="search-field event-search"><Icon>⌕</Icon><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search event type or ID…" aria-label="Search events" /></label></div>
+          {visibleEvents.length === 0 ? <div className="manager-empty"><span className="empty-mark">≋</span><strong>{loading ? "Loading events…" : "No matching events"}</strong><p>Send a test event or ingest an event matching one of your active endpoints.</p></div> : (
+            <div className="event-log-list">{visibleEvents.map((event) => (
+              <article className="event-log-row" key={event.id}>
+                <button className="event-log-summary" onClick={() => setExpandedId(expandedId === event.id ? "" : event.id)} aria-expanded={expandedId === event.id}>
+                  <span className="event-log-symbol"><Icon>≋</Icon></span>
+                  <span className="event-log-main"><strong>{event.eventType}</strong><code>{event.id}</code></span>
+                  <span className={`event-status status-${event.status.toLowerCase()}`}>{event.status}</span>
+                  <span className="event-log-counts">{event.deliveredCount}/{event.deliveryCount} delivered{event.failedCount ? ` · ${event.failedCount} failed` : ""}</span>
+                  <span className="event-log-date">{new Date(event.createdAt).toLocaleString()}</span>
+                  <Icon>{expandedId === event.id ? "⌃" : "⌄"}</Icon>
+                </button>
+                {expandedId === event.id && <div className="event-log-details"><div><span className="mini-label">PAYLOAD</span><pre>{JSON.stringify(event.payload, null, 2)}</pre></div><div><span className="mini-label">MATCHED ENDPOINTS</span>{event.deliveries.length ? event.deliveries.map((delivery) => <div className="event-endpoint-chip" key={delivery.id}><span>{delivery.endpoint.name}</span><span className={`delivery-state state-${delivery.status.toLowerCase()}`}>{delivery.status}</span></div>) : <p className="auth-note">No matching endpoint delivery was created.</p>}</div></div>}
+              </article>
+            ))}</div>
+          )}
+        </section>
+      )}
+    </div>
+  );
+}
 
 function DeliveriesManager({ onNavigate }) {
   const [token] = useState(() => sessionStorage.getItem("webhookhub_access_token") || "");
