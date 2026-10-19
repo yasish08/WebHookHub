@@ -16,7 +16,9 @@ export function createOverviewRouter(prisma) {
   router.get("/", async (req, res) => {
     const userId = req.auth.userId;
     const deliveryScope = { endpoint: { userId } };
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setUTCHours(0, 0, 0, 0);
+    sevenDaysAgo.setUTCDate(sevenDaysAgo.getUTCDate() - 6);
 
     try {
       const [
