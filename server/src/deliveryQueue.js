@@ -23,6 +23,7 @@ export async function enqueueDelivery(deliveryId, delay = 0, attemptNumber = 1) 
     jobId: `delivery-${deliveryId}-attempt-${attemptNumber}`,
     delay: Math.max(0, Math.floor(delay)),
     removeOnComplete: true,
+    removeOnFail: true,
   });
   let timeout;
   try {
