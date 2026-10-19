@@ -44,15 +44,21 @@ async function processDelivery(job) {
   let responseBody = "";
   let errorMessage = null;
   let succeeded = false;
+  let retryableFailure = true;
 
   try {
     // Re-check the destination at send time and refuse redirects. This blocks
     // common SSRF vectors; network-level egress controls are still recommended
     // because DNS can theoretically change between validation and connection.
     const safeUrl = await validateEndpointUrl(delivery.endpoint.url);
-    if (!safeUrl.ok) throw new Error(`Destination rejected at delivery time: ${safeUrl.message}`);
+    if (!safeUrl.ok) {
+      retryableFailure = false;
+      throw new Error(`Destination rejected at delivery time: ${safeUrl.message}`);
+    }
 
-    const secret = decryptEndpointSecret(delivery.endpoint.secret);
+    let secret;
+    try { secret = decryptEndpointSecret(delivery.endpoint.secret); }
+    catch (error) { retryableFailure = false; throw error; }
     const rawBody = JSON.stringify({
       id: delivery.event.id,
       type: delivery.event.eventType,
@@ -87,8 +93,9 @@ async function processDelivery(job) {
   }
 
   const durationMs = Date.now() - startedAt;
-  const canRetry = !succeeded && attemptNumber < MAX_DELIVERY_ATTEMPTS &&
+  const canRetry = !succeeded && retryableFailure && attemptNumber < MAX_DELIVERY_ATTEMPTS &&
     (responseStatus === null || shouldRetryStatus(responseStatus));
+  const retryDelayMs = canRetry ? calculateRetryDelay(attemptNumber) : null;
 
   await prisma.$transaction(async (tx) => {
     await tx.deliveryAttempt.create({
@@ -110,14 +117,17 @@ async function processDelivery(job) {
         errorMessage: succeeded ? null : errorMessage,
         durationMs,
         deliveredAt: succeeded ? new Date() : null,
-        nextAttemptAt: canRetry ? new Date(Date.now() + calculateRetryDelay(attemptNumber)) : null,
+        nextAttemptAt: canRetry ? new Date(Date.now() + retryDelayMs) : null,
       },
     });
   });
 
   if (canRetry) {
-    const delay = calculateRetryDelay(attemptNumber);
-    await enqueueDelivery(delivery.id, delay, attemptNumber + 1);
+    try {
+      await enqueueDelivery(delivery.id, retryDelayMs, attemptNumber + 1);
+    } catch (error) {
+      console.error("[worker:retry_enqueue_error]", { deliveryId: delivery.id, message: error?.message });
+    }
   }
 
   console.log(JSON.stringify({
