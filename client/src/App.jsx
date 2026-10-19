@@ -88,6 +88,8 @@ function App() {
   };
 
   const sendTestEvent = async () => {
+    const token = sessionStorage.getItem("webhookhub_access_token");
+    if (!token) { setActiveNav("Endpoints"); return; }
     setTestEventState("sending");
     try {
       const response = await fetch("/api/events", {
@@ -95,6 +97,7 @@ function App() {
         headers: {
           "Content-Type": "application/json",
           "Idempotency-Key": `dashboard-test-${Date.now()}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           eventType: "webhookhub.test",
