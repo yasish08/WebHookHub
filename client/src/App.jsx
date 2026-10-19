@@ -196,9 +196,9 @@ function App() {
           <section className="middle-grid">
             <div className="panel activity-panel">
               <div className="panel-heading"><div><h2>Delivery activity</h2><p>Events processed over the last 7 days</p></div><button className="select-button">Last 7 days <Icon>⌄</Icon></button></div>
-              <div className="chart-summary"><strong>2,840</strong><span className="chart-change">↗ 12.8%</span><span className="chart-caption">events processed</span></div>
-              <ActivityChart />
-              <div className="chart-axis"><span>Oct 07</span><span>Oct 08</span><span>Oct 09</span><span>Oct 10</span><span>Oct 11</span><span>Oct 12</span><span>Oct 13</span></div>
+              <div className="chart-summary"><strong>{overviewData ? overviewData.metrics.eventsLast7Days.toLocaleString() : "2,840"}</strong><span className="chart-change">{overviewData ? "last 7 days" : "sample data"}</span><span className="chart-caption">events received</span></div>
+              <ActivityChart data={overviewData?.activityByDay} />
+              <div className="chart-axis">{(overviewData?.activityByDay || [{ label: "Oct 07" }, { label: "Oct 08" }, { label: "Oct 09" }, { label: "Oct 10" }, { label: "Oct 11" }, { label: "Oct 12" }, { label: "Oct 13" }]).map((day) => <span key={day.date || day.label}>{day.label}</span>)}</div>
             </div>
             <div className="panel endpoint-panel">
               <div className="panel-heading"><div><h2>Active endpoints</h2><p>Destination health at a glance</p></div><button className="text-button" onClick={() => setActiveNav("Endpoints")}>View all <Icon>→</Icon></button></div>
@@ -564,9 +564,15 @@ function StatusPill({ status }) {
   return <span className={`status-pill ${status.toLowerCase()}`}><span>{icon}</span>{status}</span>;
 }
 
-function ActivityChart() {
-  const bars = [32, 45, 38, 56, 48, 65, 42, 53, 71, 60, 49, 76, 57, 68, 47, 63, 82, 66, 52, 72, 60, 88, 69, 77, 55, 70, 93, 73, 83, 64, 78, 100, 75, 89, 67, 80, 96, 74, 87, 70, 82, 94, 76, 88, 71, 98, 84, 91];
-  return <div className="activity-chart" role="img" aria-label="Bar chart showing daily webhook event activity trending upward"><div className="chart-grid"><span>800</span><span>600</span><span>400</span><span>200</span><span>0</span></div><div className="bar-area">{bars.map((height, index) => <span key={index} className={index > 39 ? "bar bar-highlight" : "bar"} style={{ height: `${height}%` }} />)}</div></div>;
+function ActivityChart({ data }) {
+  const demoBars = [32, 45, 38, 56, 48, 65, 42, 53, 71, 60, 49, 76, 57, 68, 47, 63, 82, 66, 52, 72, 60, 88, 69, 77, 55, 70, 93, 73, 83, 64, 78, 100, 75, 89, 67, 80, 96, 74, 87, 70, 82, 94, 76, 88, 71, 98, 84, 91];
+  const actual = Array.isArray(data) && data.length > 0;
+  const values = actual ? data.map((day) => day.count) : demoBars;
+  const maxValue = Math.max(1, ...values);
+  return <div className="activity-chart" role="img" aria-label={actual ? "Bar chart showing event volume over the last seven days" : "Illustrative bar chart showing a sample event trend"}><div className="chart-grid"><span>100%</span><span>75%</span><span>50%</span><span>25%</span><span>0</span></div><div className="bar-area">{values.map((value, index) => {
+    const height = actual ? Math.max(value > 0 ? 5 : 2, Math.round((value / maxValue) * 100)) : value;
+    return <span key={actual ? data[index].date : index} className={actual ? (index >= values.length - 2 ? "bar bar-highlight" : "bar") : (index > 39 ? "bar bar-highlight" : "bar")} style={{ height: `${height}%` }} title={actual ? `${data[index].label}: ${value} events` : "Sample activity"} />;
+  })}</div></div>;
 }
 
 export default App;
