@@ -15,6 +15,7 @@ import {
 
 const prisma = new PrismaClient();
 const port = Number(process.env.WORKER_CONCURRENCY || 8);
+let shuttingDown = false;
 
 async function processDelivery(job) {
   const { deliveryId } = job.data;
@@ -161,11 +162,12 @@ async function recoverPendingDeliveries() {
         status: { in: ["PENDING", "RETRYING"] },
         OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }],
       },
-      select: { id: true, attemptCount: true },
+      select: { id: true, attemptCount: true, endpoint: { select: { status: true } } },
       take: 200,
       orderBy: { createdAt: "asc" },
     });
     for (const delivery of due) {
+      if (delivery.endpoint.status !== "ACTIVE") continue;
       try {
         await enqueueDelivery(delivery.id, 0, Math.max(1, delivery.attemptCount + 1));
       } catch (error) {
@@ -184,7 +186,6 @@ void recoverPendingDeliveries();
 const recoveryTimer = setInterval(() => void recoverPendingDeliveries(), 30_000);
 recoveryTimer.unref();
 
-let shuttingDown = false;
 async function shutdown(signal) {
   if (shuttingDown) return;
   shuttingDown = true;
