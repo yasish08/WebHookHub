@@ -38,7 +38,7 @@ test("rejects expired, malformed, and tampered signature headers", () => {
   const signed = createWebhookSignature(rawBody, secret, 1_700_000_000);
   assert.equal(verifyWebhookSignature(rawBody, secret, signed.signature, { nowSeconds: 1_800_000_000 }), false);
   assert.equal(verifyWebhookSignature(rawBody, secret, "nonsense", { nowSeconds: 1_700_000_000 }), false);
-  assert.equal(verifyWebhookSignature(rawBody, secret, signed.signature.replace(/[a-f]$/, "0"), { nowSeconds: 1_700_000_000 }), false);
+  assert.equal(verifyWebhookSignature(rawBody, secret, signed.signature.replace(/v1=([a-f0-9])/, (_match, first) => `v1=${first === "0" ? "1" : "0"}`), { nowSeconds: 1_700_000_000 }), false);
 });
 
 test("truncates captured response bodies to avoid unbounded database writes", () => {
