@@ -281,9 +281,19 @@ function AuthScreen({ onAuthenticated }) {
     }
   };
 
+  const moveShowcase = (event) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / rect.width) * 100;
+    const y = ((event.clientY - rect.top) / rect.height) * 100;
+    event.currentTarget.style.setProperty("--pointer-x", `${x}%`);
+    event.currentTarget.style.setProperty("--pointer-y", `${y}%`);
+    event.currentTarget.style.setProperty("--pointer-tilt-x", `${((y - 50) / 50) * -3}deg`);
+    event.currentTarget.style.setProperty("--pointer-tilt-y", `${((x - 50) / 50) * 4}deg`);
+  };
+
   return (
     <main className="auth-screen">
-      <section className="auth-showcase">
+      <section className="auth-showcase" onPointerMove={moveShowcase}>
         <a className="brand auth-brand" href="/" aria-label="WebHookHub home">
           <span className="brand-mark"><span /><span /><span /></span>
           <span>webhook<span className="brand-light">hub</span></span>
@@ -297,8 +307,20 @@ function AuthScreen({ onAuthenticated }) {
             <div><span>↗</span><div><strong>Full visibility</strong><p>Track events from ingestion to response.</p></div></div>
             <div><span>⌘</span><div><strong>Built for developers</strong><p>Secure endpoints with signed webhooks.</p></div></div>
           </div>
+          <div className="hero-live-preview" aria-label="Illustration of webhook event delivery">
+            <div className="preview-orbit preview-orbit-one" />
+            <div className="preview-orbit preview-orbit-two" />
+            <div className="preview-glow" />
+            <div className="preview-topline"><span><i /> LIVE PIPELINE</span><span className="preview-live"><b /> OPERATIONAL</span></div>
+            <div className="preview-flow">
+              <div className="preview-node preview-source"><span>↗</span><small>EVENT</small><strong>payment.created</strong><em>Incoming event</em></div>
+              <div className="preview-connector"><i /><i /><i /><span>→</span></div>
+              <div className="preview-node preview-target"><span>⌁</span><small>DELIVERY</small><strong>your-endpoint</strong><em><b /> HTTP 200 · 84 ms</em></div>
+            </div>
+            <div className="preview-bottomline"><span><i /> Signed payload verified</span><span>RETRY READY <b>↻</b></span></div>
+          </div>
         </div>
-        <p className="auth-showcase-footer">© 2026 WebHookHub · Built for reliable delivery</p>
+        <p className="auth-showcase-footer"><span>✳</span> © 2026 WebHookHub <i /> BUILT FOR RELIABLE DELIVERY</p>
       </section>
       <section className="auth-form-side">
         <div className="auth-form-wrap">
