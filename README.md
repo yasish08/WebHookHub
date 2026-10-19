@@ -51,7 +51,8 @@ Dashboard metric cards, activity chart, endpoint health rows, and recent-deliver
 
 - Node.js 20 or newer
 - npm 10 or newer
-- PostgreSQL 14 or newer (for database-backed health checks)
+- PostgreSQL 14 or newer
+- Redis 6 or newer (for BullMQ delivery queue and worker)
 
 ## Run locally
 
@@ -84,7 +85,7 @@ Dashboard metric cards, activity chart, endpoint health rows, and recent-deliver
 
 6. Open the dashboard at [http://localhost:5173](http://localhost:5173). API routes are served at [http://localhost:4000/api](http://localhost:4000/api).
 
-The API health endpoint is [http://localhost:4000/api/health](http://localhost:4000/api/health). It returns a degraded status until PostgreSQL is configured and reachable.
+The API health endpoint is [http://localhost:4000/api/health](http://localhost:4000/api/health). It returns a degraded status until both PostgreSQL and Redis are configured and reachable.
 
 ### Send a test event
 
@@ -145,7 +146,7 @@ curl -X POST http://localhost:4000/api/endpoints \
   -d '{"name":"payments-prod","url":"https://hooks.example.com/events","eventTypes":["payment.succeeded"]}'
 ```
 
-The response includes `signingSecret` exactly once. Store it securely. Endpoint secrets are encrypted in the database using `SECRET_ENCRYPTION_KEY`; losing or changing that key makes previously encrypted secrets unreadable. Endpoint URLs are DNS-checked at creation/update time, but the delivery worker must repeat destination resolution and private-IP checks at send time to defend against DNS rebinding.
+The response includes `signingSecret` exactly once. Store it securely. Endpoint secrets are encrypted in the database using `SECRET_ENCRYPTION_KEY`; losing or changing that key makes previously encrypted secrets unreadable. Endpoint URLs are DNS-checked at creation/update time, and the delivery worker repeats destination resolution immediately before sending.
 
 ## Product roadmap
 
@@ -159,7 +160,7 @@ The response includes `signingSecret` exactly once. Store it securely. Endpoint 
 
 ## Security notes
 
-Never commit real credentials or endpoint secrets. Endpoint signing secrets are encrypted at rest using AES-256-GCM and returned only at creation or rotation. The MVP `POST /api/events` route is currently unauthenticated; add scoped API keys and rate limiting before exposing it publicly. Never commit real credentials. URL validation blocks local/private IPs and checks DNS at endpoint creation/update time; the worker repeats DNS resolution before sending and refuses redirects. DNS can still change between validation and the socket connection, so deploy with network-level egress controls or IP-pinned connection logic before exposing this to untrusted endpoint registrations. Production deployment should also add rate limiting, abuse monitoring, and a key-rotation procedure.
+Never commit real credentials or endpoint secrets. Endpoint signing secrets are encrypted at rest using AES-256-GCM and returned only at creation or rotation. The MVP `POST /api/events` route is currently unauthenticated; add scoped API keys and rate limiting before exposing it publicly. URL validation blocks local/private IPs and checks DNS at endpoint creation/update time; the worker repeats DNS resolution before sending and refuses redirects. DNS can still change between validation and the socket connection, so deploy with network-level egress controls or IP-pinned connection logic before exposing this to untrusted endpoint registrations. Production deployment should also add rate limiting, abuse monitoring, and a key-rotation procedure.
 
 ## License
 
