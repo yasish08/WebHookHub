@@ -36,6 +36,7 @@ model User {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
   endpoints    Endpoint[]
+  events       Event[]
 }
 
 model Endpoint {
@@ -55,14 +56,18 @@ model Endpoint {
 }
 
 model Event {
-  id          String      @id @default(cuid())
-  eventType   String
-  payload     Json
-  status      EventStatus @default(ACCEPTED)
-  idempotencyKey String?  @unique
-  deliveries  Delivery[]
-  createdAt   DateTime    @default(now())
+  id             String      @id @default(cuid())
+  eventType      String
+  payload        Json
+  status         EventStatus @default(ACCEPTED)
+  userId         String
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  idempotencyKey String?
+  deliveries     Delivery[]
+  createdAt      DateTime    @default(now())
 
+  @@unique([userId, idempotencyKey])
+  @@index([userId, createdAt])
   @@index([eventType, createdAt])
   @@index([status, createdAt])
 }
