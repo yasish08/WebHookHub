@@ -145,11 +145,51 @@ worker.on("failed", (job, error) => {
 
 console.log(`[webhookhub-worker] listening on queue ${DELIVERY_QUEUE_NAME} (concurrency ${port})`);
 
+let recoveryRunning = false;
+async function recoverPendingDeliveries() {
+  if (recoveryRunning || shuttingDown) return;
+  recoveryRunning = true;
+  try {
+    const now = new Date();
+    const staleBefore = new Date(Date.now() - 60_000);
+    await prisma.delivery.updateMany({
+      where: { status: "PROCESSING", updatedAt: { lt: staleBefore } },
+      data: { status: "PENDING", errorMessage: "Recovered after worker interruption." },
+    });
+    const due = await prisma.delivery.findMany({
+      where: {
+        status: { in: ["PENDING", "RETRYING"] },
+        OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }],
+      },
+      select: { id: true, attemptCount: true },
+      take: 200,
+      orderBy: { createdAt: "asc" },
+    });
+    for (const delivery of due) {
+      try {
+        await enqueueDelivery(delivery.id, 0, Math.max(1, delivery.attemptCount + 1));
+      } catch (error) {
+        console.error("[worker:recovery_enqueue_error]", { deliveryId: delivery.id, message: error?.message });
+        break;
+      }
+    }
+    if (due.length) console.log(`[worker] recovery sweep checked ${due.length} due deliveries`);
+  } catch (error) {
+    console.error("[worker:recovery_error]", error);
+  } finally {
+    recoveryRunning = false;
+  }
+}
+void recoverPendingDeliveries();
+const recoveryTimer = setInterval(() => void recoverPendingDeliveries(), 30_000);
+recoveryTimer.unref();
+
 let shuttingDown = false;
 async function shutdown(signal) {
   if (shuttingDown) return;
   shuttingDown = true;
   console.log(`[webhookhub-worker] ${signal} received; shutting down`);
+  clearInterval(recoveryTimer);
   await worker.close();
   await closeDeliveryQueue();
   await prisma.$disconnect();
