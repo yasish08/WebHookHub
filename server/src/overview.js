@@ -23,7 +23,6 @@ export function createOverviewRouter(prisma) {
         endpointCount,
         activeEndpointCount,
         eventCount,
-        eventsLast7DaysCount,
         deliveredCount,
         retryCount,
         failedCount,
@@ -31,6 +30,7 @@ export function createOverviewRouter(prisma) {
         averageDuration,
         endpoints,
         deliveries,
+        eventsLast7DaysCount,
         activityEvents,
       ] = await Promise.all([
         prisma.endpoint.count({ where: { userId } }),
