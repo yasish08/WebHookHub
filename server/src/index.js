@@ -7,6 +7,7 @@ import { createAuthRouter } from "./auth.js";
 import { createEndpointRouter } from "./endpoints.js";
 import { createDeliveryRouter } from "./deliveries.js";
 import { createOverviewRouter } from "./overview.js";
+import { createEventReadRouter } from "./eventRead.js";
 import { enqueueDelivery, pingRedis, closeDeliveryQueue } from "./deliveryQueue.js";
 
 const app = express();
@@ -20,6 +21,7 @@ app.use("/api/auth", createAuthRouter(prisma));
 app.use("/api/endpoints", createEndpointRouter(prisma));
 app.use("/api/deliveries", createDeliveryRouter(prisma));
 app.use("/api/overview", createOverviewRouter(prisma));
+app.use("/api/events", createEventReadRouter(prisma));
 
 app.get("/api/health", async (_req, res) => {
   let database = "not_configured";
@@ -53,6 +55,7 @@ app.get("/api", (_req, res) => {
     routes: {
       health: "GET /api/health",
       ingestEvent: "POST /api/events",
+      eventHistory: "GET /api/events (Bearer JWT)",
       endpoints: "GET /api/endpoints",
       deliveries: "GET /api/deliveries",
       overview: "GET /api/overview (Bearer JWT)",
