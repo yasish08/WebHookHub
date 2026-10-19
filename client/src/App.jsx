@@ -1,15 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 
-const initialDeliveries = [
-  { id: "evt_8f2a91", destination: "payments-prod", event: "payment.succeeded", status: "Delivered", code: 200, time: "Just now", latency: "124 ms" },
-  { id: "evt_8f2a88", destination: "analytics-pipeline", event: "user.created", status: "Delivered", code: 202, time: "2 min ago", latency: "86 ms" },
-  { id: "evt_8f2a73", destination: "crm-sync", event: "customer.updated", status: "Retrying", code: 503, time: "4 min ago", latency: "2.4 s" },
-  { id: "evt_8f2a61", destination: "payments-prod", event: "invoice.paid", status: "Delivered", code: 200, time: "7 min ago", latency: "143 ms" },
-  { id: "evt_8f2a42", destination: "warehouse-hook", event: "order.fulfilled", status: "Failed", code:  timeoutCode(), time: "11 min ago", latency: "10.0 s" },
-];
-
-function timeoutCode() { return "TIMEOUT"; }
-
 const navItems = [
   { label: "Overview", icon: "◫" },
   { label: "Endpoints", icon: "⌁", count: "4" },
@@ -70,7 +60,7 @@ function App() {
         time: delivery.timeLabel,
         latency: delivery.latencyLabel,
       }))
-    : initialDeliveries, [overviewData]);
+    : [], [overviewData]);
 
   const visibleDeliveries = useMemo(() => dashboardDeliveries.filter((item) => {
     const matchesSearch = `${item.id} ${item.destination} ${item.event}`.toLowerCase().includes(search.toLowerCase());
@@ -101,10 +91,13 @@ function App() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          eventType: "webhookhub.test",
+          eventType: "payment.created",
           payload: {
-            source: "dashboard",
-            message: "Hello from WebHookHub",
+            paymentId: `pay_test_${Date.now()}`,
+            amount: 499,
+            currency: "INR",
+            status: "success",
+            source: "webhookhub-dashboard-test",
             sentAt: new Date().toISOString(),
           },
         }),
@@ -199,34 +192,29 @@ function App() {
           </section>
 
           <section className="metrics-grid" aria-label="Delivery metrics">
-            <Metric title="Events received" value="2,840" delta="+12.8%" detail="vs. last 7 days" icon="↙" tone="violet" />
-            <Metric title="Successful deliveries" value="2,716" delta="95.6%" detail="delivery success rate" icon="✓" tone="green" />
-            <Metric title="Pending retries" value="18" delta="−4.2%" detail="vs. last 7 days" icon="↻" tone="amber" />
-            <Metric title="Avg. response time" value="142 ms" delta="−18 ms" detail="vs. last 7 days" icon="ϟ" tone="blue" />
+            <Metric title="Events received" value={overviewData ? overviewData.metrics.eventCount.toLocaleString() : "—"} delta={overviewData ? `${overviewData.metrics.eventsLast7Days} this week` : "Loading"} detail="total events received" icon="↙" tone="violet" />
+            <Metric title="Successful deliveries" value={overviewData ? overviewData.metrics.deliveredCount.toLocaleString() : "—"} delta={overviewData ? `${overviewData.metrics.successRate}%` : "Loading"} detail="successful deliveries" icon="✓" tone="green" />
+            <Metric title="Pending retries" value={overviewData ? overviewData.metrics.pendingCount.toLocaleString() : "—"} delta="current queue" detail="pending / processing" icon="↻" tone="amber" />
+            <Metric title="Avg. response time" value={overviewData?.metrics.averageDurationMs == null ? "—" : `${overviewData.metrics.averageDurationMs} ms`} delta="measured" detail="average delivery duration" icon="ϟ" tone="blue" />
           </section>
 
           <section className="middle-grid">
             <div className="panel activity-panel">
               <div className="panel-heading"><div><h2>Delivery activity</h2><p>Events processed over the last 7 days</p></div><button className="select-button">Last 7 days <Icon>⌄</Icon></button></div>
-              <div className="chart-summary"><strong>{overviewData ? overviewData.metrics.eventsLast7Days.toLocaleString() : "2,840"}</strong><span className="chart-change">{overviewData ? "last 7 days" : "sample data"}</span><span className="chart-caption">events received</span></div>
+              <div className="chart-summary"><strong>{overviewData ? overviewData.metrics.eventsLast7Days.toLocaleString() : "—"}</strong><span className="chart-change">{overviewData ? "last 7 days" : "Loading real metrics"}</span><span className="chart-caption">events received</span></div>
               <ActivityChart data={overviewData?.activityByDay} />
-              <div className="chart-axis">{(overviewData?.activityByDay || [{ label: "Oct 07" }, { label: "Oct 08" }, { label: "Oct 09" }, { label: "Oct 10" }, { label: "Oct 11" }, { label: "Oct 12" }, { label: "Oct 13" }]).map((day) => <span key={day.date || day.label}>{day.label}</span>)}</div>
+              <div className="chart-axis">{(overviewData?.activityByDay || []).map((day) => <span key={day.date || day.label}>{day.label}</span>)}</div>
             </div>
             <div className="panel endpoint-panel">
               <div className="panel-heading"><div><h2>Endpoints</h2><p>Destination status at a glance</p></div><button className="text-button" onClick={() => setActiveNav("Endpoints")}>View all <Icon>→</Icon></button></div>
-              {(overviewData ? overviewData.endpoints : [
-                { id: "demo-1", name: "payments-prod", url: "api.acme.com/hooks/payments", status: "ACTIVE" },
-                { id: "demo-2", name: "analytics-pipeline", url: "events.acme.io/ingest", status: "ACTIVE" },
-                { id: "demo-3", name: "crm-sync", url: "hooks.acme.io/crm", status: "PAUSED" },
-                { id: "demo-4", name: "warehouse-hook", url: "data.acme.io/webhooks", status: "ACTIVE" },
-              ]).map((endpoint, index) => <EndpointRow key={endpoint.id} name={endpoint.name} url={endpoint.url} initials={endpoint.name.slice(0, 1).toUpperCase()} tone={["purple", "blue", "orange", "green"][index % 4]} state={endpoint.status === "ACTIVE" ? "Active" : "Paused"} />)}
+              {(overviewData?.endpoints || []).map((endpoint, index) => <EndpointRow key={endpoint.id} name={endpoint.name} url={endpoint.url} initials={endpoint.name.slice(0, 1).toUpperCase()} tone={["purple", "blue", "orange", "green"][index % 4]} state={endpoint.status === "ACTIVE" ? "Active" : "Paused"} />)}
               <button className="add-endpoint" onClick={() => setActiveNav("Endpoints")}><Icon>＋</Icon> Add endpoint <span>→</span></button>
             </div>
           </section>
 
           <section className="panel deliveries-panel">
             <div className="panel-heading deliveries-heading">
-              <div><h2>Recent deliveries <span className="count-chip">{overviewData ? overviewData.recentDeliveries.length : 24}</span></h2><p>Monitor the latest attempts across your endpoints</p></div>
+              <div><h2>Recent deliveries <span className="count-chip">{overviewData ? overviewData.recentDeliveries.length : 0}</span></h2><p>Monitor the latest attempts across your endpoints</p></div>
               <button className="text-button" onClick={() => setActiveNav("Deliveries")}>View delivery log <Icon>→</Icon></button>
             </div>
             <div className="table-toolbar">
@@ -246,11 +234,11 @@ function App() {
                     <td className="time-cell">{delivery.time}</td><td><code className="latency">{delivery.latency}</code></td>
                     <td><button className="row-more" aria-label={`Actions for ${delivery.id}`}>···</button></td>
                   </tr>)}
-                  {visibleDeliveries.length === 0 && <tr><td colSpan="7" className="empty-state">No deliveries match your search.</td></tr>}
+                  {visibleDeliveries.length === 0 && <tr><td colSpan="7" className="empty-state">No real deliveries yet. Send an event matching an active endpoint to create a delivery.</td></tr>}
                 </tbody>
               </table>
             </div>
-            <div className="table-footer"><span>Showing <strong>{visibleDeliveries.length}</strong> of {overviewData ? overviewData.recentDeliveries.length : 24} recent deliveries</span><div className="pagination"><button disabled>←</button><button className="page-current">1</button><button>2</button><button>3</button><span>…</span><button>5</button><button>→</button></div></div>
+            <div className="table-footer"><span>Showing <strong>{visibleDeliveries.length}</strong> of {overviewData ? overviewData.recentDeliveries.length : 0} recent deliveries</span><div className="pagination"><button disabled>←</button><button className="page-current">1</button><button>2</button><button>3</button><span>…</span><button>5</button><button>→</button></div></div>
           </section>
 
           <footer className="page-footer"><span>© 2026 WebHookHub</span><span><span className="footer-live-dot" /> All systems operational <span className="footer-separator">·</span> Built for reliable delivery</span><a href="https://github.com/yasish08/WebHookHub" target="_blank" rel="noreferrer">GitHub <Icon>↗</Icon></a></footer>
