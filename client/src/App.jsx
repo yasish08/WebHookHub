@@ -205,10 +205,12 @@ function App() {
             </div>
             <div className="panel endpoint-panel">
               <div className="panel-heading"><div><h2>Endpoints</h2><p>Destination status at a glance</p></div><button className="text-button" onClick={() => setActiveNav("Endpoints")}>View all <Icon>→</Icon></button></div>
-              <EndpointRow name="payments-prod" url="api.acme.com/hooks/payments" initials="P" tone="purple" state="Healthy" />
-              <EndpointRow name="analytics-pipeline" url="events.acme.io/ingest" initials="A" tone="blue" state="Healthy" />
-              <EndpointRow name="crm-sync" url="hooks.acme.io/crm" initials="C" tone="orange" state="Degraded" />
-              <EndpointRow name="warehouse-hook" url="data.acme.io/webhooks" initials="W" tone="green" state="Healthy" />
+              {(overviewData ? overviewData.endpoints : [
+                { id: "demo-1", name: "payments-prod", url: "api.acme.com/hooks/payments", status: "ACTIVE" },
+                { id: "demo-2", name: "analytics-pipeline", url: "events.acme.io/ingest", status: "ACTIVE" },
+                { id: "demo-3", name: "crm-sync", url: "hooks.acme.io/crm", status: "PAUSED" },
+                { id: "demo-4", name: "warehouse-hook", url: "data.acme.io/webhooks", status: "ACTIVE" },
+              ]).map((endpoint, index) => <EndpointRow key={endpoint.id} name={endpoint.name} url={endpoint.url} initials={endpoint.name.slice(0, 1).toUpperCase()} tone={["purple", "blue", "orange", "green"][index % 4]} state={endpoint.status === "ACTIVE" ? "Active" : "Paused"} />)}
               <button className="add-endpoint" onClick={() => setActiveNav("Endpoints")}><Icon>＋</Icon> Add endpoint <span>→</span></button>
             </div>
           </section>
@@ -618,7 +620,7 @@ function Metric({ title, value, delta, detail, icon, tone }) {
 }
 
 function EndpointRow({ name, url, initials, tone, state }) {
-  return <div className="endpoint-row"><div className={`endpoint-avatar ${tone}`}>{initials}</div><div className="endpoint-row-copy"><strong>{name}</strong><span>{url}</span></div><span className={`endpoint-health ${state === "Healthy" ? "healthy" : "degraded"}`}><span />{state}</span></div>;
+  return <div className="endpoint-row"><div className={`endpoint-avatar ${tone}`}>{initials}</div><div className="endpoint-row-copy"><strong>{name}</strong><span>{url}</span></div><span className={`endpoint-health ${state === "Active" ? "healthy" : "degraded"}`}><span />{state}</span></div>;
 }
 
 function StatusPill({ status }) {
