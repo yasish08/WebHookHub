@@ -426,7 +426,9 @@ function DeliveriesManager({ onNavigate }) {
     setLoading(true);
     setError("");
     try {
-      const query = status === "ALL" ? "" : `?status=${encodeURIComponent(status)}`;
+      const params = new URLSearchParams({ limit: "50" });
+      if (status !== "ALL") params.set("status", status);
+      const query = `?${params.toString()}`;
       const response = await fetch(`/api/deliveries${query}`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || "Delivery history could not be loaded.");
