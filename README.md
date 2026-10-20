@@ -56,7 +56,6 @@ When signed in, overview metrics, endpoint rows, recent deliveries, event histor
 - npm 10 or newer
 - PostgreSQL 14 or newer
 - Redis 6 or newer (for BullMQ delivery queue and worker)
-- Redis 6 or newer (for BullMQ delivery queue and worker)
 
 ## Run locally
 
@@ -96,6 +95,12 @@ When signed in, overview metrics, endpoint rows, recent deliveries, event histor
 7. Open the dashboard at [http://localhost:5173](http://localhost:5173). API routes are served at [http://localhost:4000/api](http://localhost:4000/api).
 
 Use `docker compose ps` to confirm PostgreSQL and Redis are healthy; stop them with `docker compose down` (persistent development data remains in named volumes). The API health endpoint is [http://localhost:4000/api/health](http://localhost:4000/api/health). It returns a degraded status until both PostgreSQL and Redis are configured and reachable.
+
+
+
+### Local Redis port note
+
+Docker Compose publishes Redis on host port `6380` by default to avoid conflicts with an existing Redis service on `6379`. The example server environment uses `REDIS_URL="redis://127.0.0.1:6380"` to match this mapping. If you deliberately change `REDIS_PORT` in your shell or Compose environment, update `REDIS_URL` to match the published host port.
 
 ### Send a test event
 
