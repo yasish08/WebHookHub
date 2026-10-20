@@ -837,14 +837,16 @@ function StatusPill({ status }) {
 }
 
 function ActivityChart({ data }) {
-  const demoBars = [32, 45, 38, 56, 48, 65, 42, 53, 71, 60, 49, 76, 57, 68, 47, 63, 82, 66, 52, 72, 60, 88, 69, 77, 55, 70, 93, 73, 83, 64, 78, 100, 75, 89, 67, 80, 96, 74, 87, 70, 82, 94, 76, 88, 71, 98, 84, 91];
   const actual = Array.isArray(data) && data.length > 0;
-  const values = actual ? data.map((day) => day.count) : demoBars;
+  const values = actual ? data.map((day) => day.count) : [];
   const maxValue = Math.max(1, ...values);
-  return <div className="activity-chart" role="img" aria-label={actual ? "Bar chart showing event volume over the last seven days" : "Illustrative bar chart showing a sample event trend"}><div className="chart-grid"><span>100%</span><span>75%</span><span>50%</span><span>25%</span><span>0</span></div><div className="bar-area">{values.map((value, index) => {
-    const height = actual ? Math.max(value > 0 ? 5 : 2, Math.round((value / maxValue) * 100)) : value;
-    return <span key={actual ? data[index].date : index} className={actual ? (index >= values.length - 2 ? "bar bar-highlight" : "bar") : (index > 39 ? "bar bar-highlight" : "bar")} style={{ height: `${height}%` }} title={actual ? `${data[index].label}: ${value} events` : "Sample activity"} />;
-  })}</div></div>;
+  return <div className="activity-chart" role="img" aria-label="Bar chart showing event volume over the last seven days">
+    <div className="chart-grid"><span>100%</span><span>75%</span><span>50%</span><span>25%</span><span>0</span></div>
+    <div className="bar-area">{values.map((value, index) => {
+      const height = Math.max(value > 0 ? 5 : 2, Math.round((value / maxValue) * 100));
+      return <span key={data[index].date} className={index >= values.length - 2 ? "bar bar-highlight" : "bar"} style={{ height: `${height}%` }} title={`${data[index].label}: ${value} events`} />;
+    })}</div>
+  </div>;
 }
 
 export default App;
