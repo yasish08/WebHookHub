@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 
 const navItems = [
   { label: "Overview", icon: "◫" },
-  { label: "Endpoints", icon: "⌁", count: "4" },
+  { label: "Endpoints", icon: "⌁" },
   { label: "Event log", icon: "≋" },
   { label: "Deliveries", icon: "↗" },
 ];
@@ -252,7 +252,7 @@ function App() {
         <nav className="main-nav" aria-label="Main navigation">
           {navItems.map((item) => (
             <button key={item.label} className={`nav-item ${activeNav === item.label ? "active" : ""}`} onClick={() => setActiveNav(item.label)}>
-              <Icon>{item.icon}</Icon><span>{item.label}</span>{item.count && <span className="nav-count">{item.count}</span>}
+              <Icon>{item.icon}</Icon><span>{item.label}</span>{item.label === "Endpoints" && isAuthenticated && <span className="nav-count">{overviewData?.metrics?.endpointCount ?? "—"}</span>}
             </button>
           ))}
         </nav>
