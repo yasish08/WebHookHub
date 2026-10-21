@@ -6,6 +6,7 @@ export const MAX_RESPONSE_BODY_LENGTH = 16 * 1024;
 export const DELIVERY_TIMEOUT_MS = 10_000;
 
 export function shouldRetryStatus(status) {
+  if (!Number.isInteger(status) || status < 100 || status > 599) return false;
   return status === 408 || status === 425 || status === 429 || status >= 500;
 }
 
