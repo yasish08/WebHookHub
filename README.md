@@ -9,7 +9,7 @@ WebHookHub is a developer-first webhook delivery platform built to accept events
 - **Frontend:** React, JavaScript, Vite
 - **API:** Node.js, Express
 - **Database:** PostgreSQL, Prisma ORM
-- **Delivery engine:** Redis + BullMQ queue and a separate Node.js worker
+- **Delivery engine:** Redis 6.2+ + BullMQ queue and a separate Node.js worker
 - **Security:** HMAC-SHA256 signatures, endpoint validation, JWT-scoped endpoint and delivery APIs
 
 ## Build status
@@ -55,7 +55,7 @@ When signed in, overview metrics, endpoint rows, recent deliveries, event histor
 - Node.js 20 or newer
 - npm 10 or newer
 - PostgreSQL 14 or newer
-- Redis 6 or newer (for BullMQ delivery queue and worker)
+- Redis 6.2 or newer (required by the BullMQ delivery queue and worker)
 
 ## Run locally
 
