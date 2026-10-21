@@ -12,7 +12,9 @@ import {
 
 test("retry policy retries timeouts, rate limits, and server errors", () => {
   for (const status of [408, 425, 429, 500, 502, 503]) assert.equal(shouldRetryStatus(status), true);
-  for (const status of [200, 301, 400, 401, 403, 404]) assert.equal(shouldRetryStatus(status), false);
+  for (const status of [200, 301, 400, 401, 403, 404, 499, 600, 99, NaN, "503"]) {
+    assert.equal(shouldRetryStatus(status), false, String(status));
+  }
 });
 
 test("retry delay grows exponentially and stays within configured bounds", () => {
