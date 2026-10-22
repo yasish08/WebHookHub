@@ -40,6 +40,17 @@ test("accepts an idempotency key at the maximum length and rejects longer keys",
   assert.equal(validateEventInput(body, "k".repeat(MAX_IDEMPOTENCY_KEY_LENGTH + 1)).ok, false);
 });
 
+test("rejects non-string idempotency keys defensively", () => {
+  const body = { eventType: "user.created", payload: {} };
+  for (const key of [0, 123, {}, [], true]) {
+    const result = validateEventInput(body, key);
+    assert.equal(result.ok, false);
+    assert.equal(result.error, "invalid_idempotency_key");
+  }
+  assert.equal(validateEventInput(body, null).ok, true);
+  assert.equal(validateEventInput(body, undefined).ok, true);
+});
+
 test("trims valid endpoint names", () => {
   assert.deepEqual(validateEndpointName("  payments-prod  "), { ok: true, value: "payments-prod" });
 });
