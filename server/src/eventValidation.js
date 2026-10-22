@@ -24,6 +24,15 @@ export function validateEventInput(body, idempotencyKey) {
     };
   }
 
+  if (idempotencyKey != null && typeof idempotencyKey !== "string") {
+    return {
+      ok: false,
+      status: 400,
+      error: "invalid_idempotency_key",
+      message: "Idempotency-Key must be a string.",
+    };
+  }
+
   if (idempotencyKey && idempotencyKey.length > MAX_IDEMPOTENCY_KEY_LENGTH) {
     return {
       ok: false,
