@@ -5,8 +5,13 @@ export function createEventReadRouter(prisma) {
   const router = Router();
 
   router.get("/", requireAuth, async (req, res) => {
-    const parsedLimit = Number.parseInt(req.query.limit, 10);
-    const limit = Number.isFinite(parsedLimit) ? Math.min(100, Math.max(1, parsedLimit)) : 30;
+    const rawLimit = req.query.limit;
+    const parsedLimit = typeof rawLimit === "string" && /^\d+$/.test(rawLimit)
+      ? Number(rawLimit)
+      : Number.NaN;
+    const limit = Number.isSafeInteger(parsedLimit) && parsedLimit > 0
+      ? Math.min(100, parsedLimit)
+      : 30;
     try {
       const events = await prisma.event.findMany({
         where: { userId: req.auth.userId },
