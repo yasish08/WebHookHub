@@ -62,3 +62,33 @@ test("event history returns delivery outcomes for the authenticated workspace", 
     assert.equal(receivedQuery.take, 50);
   });
 });
+
+test("event history applies safe defaults and caps oversized limits", async () => {
+  const limits = [];
+  const prisma = {
+    event: {
+      findMany: async (query) => {
+        limits.push(query.take);
+        return [];
+      },
+    },
+  };
+  await withServer(prisma, async (url) => {
+    const token = signAccessToken({ id: "user_1", email: "dev@example.com" });
+    for (const [query, expected] of [
+      ["?limit=0", 30],
+      ["?limit=-5", 30],
+      ["?limit=10oops", 30],
+      ["?limit=2.5", 30],
+      ["?limit=1000", 100],
+      ["?limit=7", 7],
+    ]) {
+      const response = await fetch(`${url}${query}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      assert.equal(response.status, 200, query);
+      await response.json();
+      assert.equal(limits.at(-1), expected, query);
+    }
+  });
+});
