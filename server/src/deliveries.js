@@ -11,8 +11,13 @@ export function createDeliveryRouter(prisma) {
   router.get("/", async (req, res) => {
     const requestedStatus = typeof req.query.status === "string" ? req.query.status.toUpperCase() : "";
     const status = DELIVERY_STATUSES.has(requestedStatus) ? requestedStatus : undefined;
-    const parsedLimit = Number.parseInt(req.query.limit, 10);
-    const limit = Number.isFinite(parsedLimit) ? Math.min(100, Math.max(1, parsedLimit)) : 30;
+    const rawLimit = req.query.limit;
+    const parsedLimit = typeof rawLimit === "string" && /^\d+$/.test(rawLimit)
+      ? Number(rawLimit)
+      : Number.NaN;
+    const limit = Number.isSafeInteger(parsedLimit) && parsedLimit > 0
+      ? Math.min(100, parsedLimit)
+      : 30;
 
     try {
       const deliveries = await prisma.delivery.findMany({
