@@ -1,4 +1,5 @@
 const windows = new Map();
+let requestsSinceSweep = 0;
 
 export function createRateLimiter({
   windowMs = 15 * 60 * 1000,
@@ -12,6 +13,13 @@ export function createRateLimiter({
   return function rateLimit(req, res, next) {
     const key = String(keyGenerator(req));
     const timestamp = now();
+    requestsSinceSweep += 1;
+    if (requestsSinceSweep >= 256) {
+      requestsSinceSweep = 0;
+      for (const [storedKey, storedEntry] of windows) {
+        if (timestamp >= storedEntry.resetAt || timestamp < storedEntry.startedAt) windows.delete(storedKey);
+      }
+    }
     let entry = windows.get(key);
     if (!entry || timestamp >= entry.resetAt || timestamp < entry.startedAt) {
       entry = { count: 0, startedAt: timestamp, resetAt: timestamp + windowMs };
@@ -38,4 +46,5 @@ export function createRateLimiter({
 // Exported only to keep unit tests isolated from shared process state.
 export function resetRateLimitStateForTests() {
   windows.clear();
+  requestsSinceSweep = 0;
 }
