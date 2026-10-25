@@ -46,6 +46,7 @@ WebHookHub is a developer-first webhook delivery platform built to accept events
 - [x] Connect delivery history and event log screens to real API data
 - [x] Add authenticated overview metrics and a seven-day event activity chart
 - [x] Run GitHub Actions unit tests and production frontend build on pushes to main
+- [x] Cover strict event/delivery pagination limits and delivery history ownership checks
 - [ ] Add full PostgreSQL/Redis end-to-end tests and deploy the app
 
 When signed in, overview metrics, endpoint rows, recent deliveries, event history, and the seven-day event chart use workspace data. Preview mode still shows clearly labelled sample metrics. The test-event button submits a real event to the API; a successful response means the event was stored, not necessarily delivered to a customer endpoint.
@@ -134,14 +135,14 @@ The unit tests use Node's built-in test runner and do not require a running Post
 | POST | `/api/auth/login` | No | Verify credentials and return JWT |
 | GET | `/api/auth/me` | Bearer JWT | Return the current account |
 | GET | `/api/overview` | Bearer JWT | User-scoped metrics, endpoint list and seven-day activity |
-| GET | `/api/events` | Bearer JWT | List recent events and their workspace delivery outcomes |
+| GET | `/api/events` | Bearer JWT | List recent events and their workspace delivery outcomes; optional `?limit=50` (defaults to 30, maximum 100) |
 | GET | `/api/endpoints` | Bearer JWT | List the current user's endpoints |
 | POST | `/api/endpoints` | Bearer JWT | Create endpoint; signing secret is returned once |
 | PATCH | `/api/endpoints/:id` | Bearer JWT | Update owned endpoint fields |
 | DELETE | `/api/endpoints/:id` | Bearer JWT | Delete an owned endpoint |
 | POST | `/api/endpoints/:id/rotate-secret` | Bearer JWT | Rotate and return a signing secret once |
 | POST | `/api/events` | Bearer JWT | Validate event, create matching deliveries and enqueue work for the current user |
-| GET | `/api/deliveries` | Bearer JWT | List the current user's delivery history; optional `?status=FAILED&limit=50` |
+| GET | `/api/deliveries` | Bearer JWT | List the current user's delivery history; optional `?status=FAILED&limit=50` (defaults to 30, maximum 100) |
 | GET | `/api/deliveries/:id/attempts` | Bearer JWT | Inspect recorded HTTP attempts |
 | POST | `/api/deliveries/:id/replay` | Bearer JWT | Queue a new delivery for the original event and endpoint |
 
