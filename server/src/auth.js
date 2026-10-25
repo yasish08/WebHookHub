@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { Router } from "express";
+import { createRateLimiter } from "./rateLimit.js";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -47,8 +48,9 @@ export function requireAuth(req, res, next) {
 
 export function createAuthRouter(prisma) {
   const router = Router();
+  const authRateLimit = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10 });
 
-  router.post("/register", async (req, res) => {
+  router.post("/register", authRateLimit, async (req, res) => {
     const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
     const password = typeof req.body?.password === "string" ? req.body.password : "";
     const name = typeof req.body?.name === "string" ? req.body.name.trim().slice(0, 80) : null;
@@ -79,7 +81,7 @@ export function createAuthRouter(prisma) {
     }
   });
 
-  router.post("/login", async (req, res) => {
+  router.post("/login", authRateLimit, async (req, res) => {
     const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
     const password = typeof req.body?.password === "string" ? req.body.password : "";
 
