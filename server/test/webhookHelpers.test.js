@@ -48,3 +48,31 @@ test("truncates captured response bodies to avoid unbounded database writes", ()
   assert.equal(truncateResponseBody("x".repeat(20_000)).length, 16 * 1024);
   assert.equal(truncateResponseBody(undefined), "");
 });
+
+test("rejects duplicate, unknown, malformed, and unsafe signature fields", () => {
+  const rawBody = '{"ok":true}';
+  const secret = "test-secret-value";
+  const signed = createWebhookSignature(rawBody, secret, 1_800_000_000);
+  const digest = signed.signature.split(",")[1];
+
+  for (const header of [
+    `t=1800000000,t=1800000000,${digest}`,
+    `t=1800000000,${digest},v1=${digest.slice(3)}`,
+    `t=+1800000000,${digest}`,
+    `t=1e9,${digest}`,
+    `t=1800000000,${digest},extra=value`,
+    `t=1800000000,${digest},`,
+  ]) {
+    assert.equal(verifyWebhookSignature(rawBody, secret, header, { nowSeconds: 1_800_000_000 }), false, header);
+  }
+
+  assert.equal(verifyWebhookSignature(rawBody, secret, signed.signature, {
+    nowSeconds: 1_800_000_000, toleranceSeconds: -1,
+  }), false);
+  assert.equal(verifyWebhookSignature(rawBody, secret, signed.signature, {
+    nowSeconds: Number.NaN,
+  }), false);
+  assert.equal(verifyWebhookSignature(rawBody, "wrong-secret", signed.signature, {
+    nowSeconds: 1_800_000_000,
+  }), false);
+});
