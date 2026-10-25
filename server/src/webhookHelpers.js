@@ -25,12 +25,24 @@ export function createWebhookSignature(rawBody, secret, timestamp = Math.floor(D
 
 export function verifyWebhookSignature(rawBody, secret, header, { toleranceSeconds = 300, nowSeconds = Math.floor(Date.now() / 1000) } = {}) {
   if (typeof header !== "string" || typeof rawBody !== "string" || typeof secret !== "string") return false;
-  const parts = Object.fromEntries(header.split(",").map((part) => {
+
+  // Reject duplicate fields instead of silently accepting whichever value appears last.
+  const parts = {};
+  for (const part of header.split(",")) {
     const index = part.indexOf("=");
-    return index < 0 ? ["", ""] : [part.slice(0, index), part.slice(index + 1)];
-  }));
+    if (index <= 0) return false;
+    const key = part.slice(0, index).trim();
+    const value = part.slice(index + 1).trim();
+    if (!["t", "v1"].includes(key) || Object.hasOwn(parts, key) || !value) return false;
+    parts[key] = value;
+  }
+
+  if (!/^\d+$/.test(parts.t || "") || !/^[a-f0-9]{64}$/i.test(parts.v1 || "")) return false;
   const timestamp = Number(parts.t);
-  if (!Number.isInteger(timestamp) || Math.abs(nowSeconds - timestamp) > toleranceSeconds || !/^[a-f0-9]{64}$/i.test(parts.v1 || "")) return false;
+  if (!Number.isSafeInteger(timestamp) || !Number.isFinite(nowSeconds) ||
+      !Number.isFinite(toleranceSeconds) || toleranceSeconds < 0 ||
+      Math.abs(nowSeconds - timestamp) > toleranceSeconds) return false;
+
   const expected = createHmac("sha256", secret).update(`${timestamp}.${rawBody}`, "utf8").digest();
   const received = Buffer.from(parts.v1, "hex");
   return received.length === expected.length && timingSafeEqual(received, expected);
