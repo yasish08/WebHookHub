@@ -90,9 +90,9 @@ async function queuePendingDeliveries(eventId) {
 
 app.post("/api/events", requireAuth, async (req, res) => {
   const headerKey = req.get("Idempotency-Key");
-  const bodyKey = typeof req.body?.idempotencyKey === "string" ? req.body.idempotencyKey : undefined;
+  const bodyKey = req.body?.idempotencyKey;
   const rawKey = headerKey ?? bodyKey;
-  const idempotencyKey = typeof rawKey === "string" ? rawKey.trim() : undefined;
+  const idempotencyKey = typeof rawKey === "string" ? rawKey.trim() : rawKey;
   const validation = validateEventInput(req.body, idempotencyKey);
 
   if (!validation.ok) {
