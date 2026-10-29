@@ -62,3 +62,27 @@ test("rejects invalid limiter configuration", () => {
   assert.throws(() => createRateLimiter({ max: 0 }), /max must be a positive integer/);
   assert.throws(() => createRateLimiter({ windowMs: -1 }), /windowMs must be a positive integer/);
 });
+
+test("keeps authenticated users in separate rate-limit buckets", () => {
+  resetRateLimitStateForTests();
+  const limiter = createRateLimiter({
+    windowMs: 60_000,
+    max: 1,
+    now: () => 20_000,
+    keyGenerator: (req) => req.auth.userId,
+  });
+
+  const firstUser = mockResponse();
+  limiter({ auth: { userId: "user-a" } }, firstUser, () => {});
+  assert.equal(firstUser.statusCode, 200);
+
+  const secondUser = mockResponse();
+  let secondContinued = false;
+  limiter({ auth: { userId: "user-b" } }, secondUser, () => { secondContinued = true; });
+  assert.equal(secondContinued, true);
+  assert.equal(secondUser.statusCode, 200);
+
+  const firstUserAgain = mockResponse();
+  limiter({ auth: { userId: "user-a" } }, firstUserAgain, () => {});
+  assert.equal(firstUserAgain.statusCode, 429);
+});
