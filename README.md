@@ -184,3 +184,8 @@ Never commit real credentials or endpoint secrets. Endpoint signing secrets are 
 ## License
 
 Not licensed for redistribution yet.
+
+
+### Rate limiting and deployment note
+
+Registration and login currently share a per-IP in-memory limit of 10 requests per 15 minutes. Authenticated event ingestion is limited to 120 requests per account per minute. These limits are process-local and reset when the API restarts; for multi-instance production deployments, replace or back the limiter with a shared store (for example Redis) and configure trusted proxy handling deliberately. The in-memory limiter is a basic abuse-control layer, not a substitute for edge-level rate limits.
