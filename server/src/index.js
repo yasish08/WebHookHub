@@ -10,10 +10,16 @@ import { createOverviewRouter } from "./overview.js";
 import { createEventReadRouter } from "./eventRead.js";
 import { requireAuth } from "./auth.js";
 import { enqueueDelivery, pingRedis, closeDeliveryQueue } from "./deliveryQueue.js";
+import { createRateLimiter } from "./rateLimit.js";
 
 const app = express();
 const prisma = new PrismaClient();
 const port = Number(process.env.PORT || 4000);
+const eventIngestionRateLimit = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 120,
+  keyGenerator: (req) => req.auth?.userId || req.ip || "unknown",
+});
 
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || "http://localhost:5173" }));
 app.use(express.json({ limit: "256kb" }));
@@ -88,7 +94,7 @@ async function queuePendingDeliveries(eventId) {
   return { queued, failed };
 }
 
-app.post("/api/events", requireAuth, async (req, res) => {
+app.post("/api/events", requireAuth, eventIngestionRateLimit, async (req, res) => {
   const headerKey = req.get("Idempotency-Key");
   const bodyKey = req.body?.idempotencyKey;
   const rawKey = headerKey ?? bodyKey;
