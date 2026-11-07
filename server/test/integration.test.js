@@ -38,10 +38,11 @@ test("PostgreSQL + Redis API integration: register, endpoint, idempotent ingest 
   let output = "";
   api.stdout.on("data", (chunk) => { output += chunk.toString(); });
   api.stderr.on("data", (chunk) => { output += chunk.toString(); });
+  let queuedJobId;
   t.after(async () => {
     api.kill("SIGTERM");
     await Promise.race([once(api, "exit"), new Promise((resolve) => setTimeout(resolve, 5000))]);
-    await queue.obliterate({ force: true }).catch(() => {});
+    if (queuedJobId) await queue.getJob(queuedJobId).then((job) => job?.remove()).catch(() => {});
     await queue.close();
     await redis.quit();
     await prisma.user.deleteMany({ where: { email } });
@@ -111,7 +112,8 @@ test("PostgreSQL + Redis API integration: register, endpoint, idempotent ingest 
     where: { eventId: first.event.id, endpointId: endpoint.id },
   });
   assert.equal(storedDeliveries.length, 1);
-  const queuedJob = await queue.getJob(`delivery-${storedDeliveries[0].id}-attempt-1`);
+  queuedJobId = `delivery-${storedDeliveries[0].id}-attempt-1`;
+  const queuedJob = await queue.getJob(queuedJobId);
   assert.ok(queuedJob, "expected the delivery to be enqueued in Redis");
 
   const historyResponse = await fetch(`${baseUrl}/api/deliveries`, { headers: { Authorization: `Bearer ${token}` } });
