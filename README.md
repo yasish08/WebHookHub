@@ -47,7 +47,7 @@ WebHookHub is a developer-first webhook delivery platform built to accept events
 - [x] Add authenticated overview metrics and a seven-day event activity chart
 - [x] Run GitHub Actions unit tests and production frontend build on pushes to main
 - [x] Cover strict event/delivery pagination limits and delivery history ownership checks
-- [ ] Add full PostgreSQL/Redis end-to-end tests and deploy the app
+- [x] Run CI integration test against real PostgreSQL and Redis services for registration, endpoint creation, idempotent event ingestion, persisted delivery, queue enqueue, and event/delivery history\n- [ ] Add worker-to-real-HTTP-endpoint delivery/retry integration tests and deploy the app
 
 When signed in, overview metrics, endpoint rows, recent deliveries, event history, and the seven-day event chart use workspace data. Preview mode still shows clearly labelled sample metrics. The test-event button submits a real event to the API; a successful response means the event was stored, not necessarily delivered to a customer endpoint.
 
@@ -123,7 +123,7 @@ Run the current input-validation tests with:
 npm test
 ```
 
-The unit tests use Node's built-in test runner and do not require a running PostgreSQL database or Redis. Full queue/worker integration still requires both services.
+The unit tests use Node's built-in test runner and do not require a running PostgreSQL database or Redis. CI now starts disposable PostgreSQL and Redis services, applies the Prisma schema, and runs an API integration test that verifies registration, endpoint creation, idempotent event ingestion, persisted delivery creation, Redis queue insertion, and authenticated event/delivery history. The test deliberately does not claim to verify outbound worker delivery or retry behavior; those still need a controllable HTTP receiver and worker-level integration coverage.
 
 ## API routes
 
