@@ -9,6 +9,35 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: webhookhub_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d webhookhub_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/webhookhub_test?schema=public
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: integration-jwt-secret-that-is-long-enough-123
+      SECRET_ENCRYPTION_KEY: integration-encryption-secret-1234567890
+      NODE_ENV: test
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -20,7 +49,11 @@ jobs:
         run: npm install
       - name: Generate Prisma client
         run: npm run db:generate
-      - name: Run tests
+      - name: Apply database schema
+        run: npm run db:push
+      - name: Run unit tests
         run: npm test
+      - name: Run PostgreSQL and Redis integration test
+        run: RUN_INTEGRATION_TESTS=1 node --test server/test/integration.test.js
       - name: Build frontend
         run: npm run build
